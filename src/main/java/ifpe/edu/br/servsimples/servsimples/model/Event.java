@@ -1,68 +1,62 @@
 package ifpe.edu.br.servsimples.servsimples.model;
 
+import ifpe.edu.br.servsimples.servsimples.repo.Subscribeable;
 import jakarta.persistence.*;
+import lombok.Getter;
+
+import java.util.HashMap;
+import java.util.Map;
 
 
+@Getter
 @Entity
-public class Event {
+public class Event implements Subscribeable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "event_id")
     private Long id;
-    @ManyToOne
-    private Agenda agenda;
     private int type;
     private String description;
     private Long start;
     private Long end;
+    @Column(name = "subscribers")
+    @ElementCollection
+    private final Map<Long, Boolean> subscribersIds = new HashMap<>();
 
     public Event() {
     }
-
-    public Long getId() {
-        return id;
-    }
-
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public Agenda getAgenda() {
-        return agenda;
-    }
-
-    public void setAgenda(Agenda agenda) {
-        this.agenda = agenda;
-    }
-
-    public int getType() {
-        return type;
     }
 
     public void setType(int type) {
         this.type = type;
     }
 
-    public String getDescription() {
-        return description;
-    }
-
     public void setDescription(String description) {
         this.description = description;
-    }
-
-    public Long getStart() {
-        return start;
     }
 
     public void setStart(Long start) {
         this.start = start;
     }
 
-    public Long getEnd() {
-        return end;
-    }
-
     public void setEnd(Long end) {
         this.end = end;
+    }
+
+    @Override
+    public void notifySubscribers() {
+
+    }
+
+    @Override
+    public void subscribe(User user) {
+        subscribersIds.put(user.getId(), true);
+    }
+
+    @Override
+    public void unsubscribe(User user) {
+        subscribersIds.put(user.getId(), false);
     }
 }

@@ -5,7 +5,7 @@ import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
 
 public class UserManager {
 
-    public static final int USER_VALID = 0;
+    public static final int USER_NOT_EXISTS = 0;
     public static final int ERROR_NAME = 1;
     public static final int ERROR_USERNAME = 2;
     public static final int ERROR_PASSWORD = 3;
@@ -20,25 +20,24 @@ public class UserManager {
         this.userRepo = userRepo;
     }
 
-
     public int getUserValidationCode(User user) {
         if (user == null) return USER_NULL;
-        if (user.getUsername() == null || user.getUsername().isEmpty() || user.getUsername().isBlank()) {
+        if (user.getUserName() == null || user.getUserName().isEmpty() || user.getUserName().isBlank()) {
             return ERROR_USERNAME;
         }
         if (user.getPassword() == null || user.getPassword().isEmpty() || user.getPassword().isBlank()) {
             return ERROR_PASSWORD;
         }
-        if (user.getCpf() == null || user.getCpf().isEmpty() || user.getCpf().isBlank()) {
+        if (user.getCPF() == null || user.getCPF().isEmpty() || user.getCPF().isBlank()) {
             return ERROR_CPF;
         }
         if (user.getName() == null || user.getName().isEmpty() || user.getName().isBlank()) {
             return ERROR_NAME;
         }
-        User restoredUser = userRepo.findByCpf(user.getCpf());
+        User restoredUser = userRepo.findByCPF(user.getCPF());
         if (restoredUser != null) {
             return USER_EXISTS;
         }
-        return USER_VALID;
+        return USER_NOT_EXISTS;
     }
 }
