@@ -1,6 +1,6 @@
 package ifpe.edu.br.servsimples.servsimples.model;
 
-import ifpe.edu.br.servsimples.servsimples.repo.Subscribeable;
+import ifpe.edu.br.servsimples.servsimples.repo.Subscriber;
 import jakarta.persistence.*;
 import lombok.Getter;
 
@@ -10,7 +10,12 @@ import java.util.Map;
 
 @Getter
 @Entity
-public class Event implements Subscribeable {
+public class Event implements Subscriber {
+    @Transient
+    public static final int TYPE_PUBLISH = 0;
+    @Transient
+    public static final int TYPE_SUBSCRIBE = 1;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "event_id")
@@ -22,8 +27,15 @@ public class Event implements Subscribeable {
     @Column(name = "subscribers")
     @ElementCollection
     private final Map<Long, Boolean> subscribersIds = new HashMap<>();
+    @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @JoinColumn(name = "event_service_id", nullable = false)
+    private Service service = new Service();
 
     public Event() {
+    }
+
+    public void setService(Service service) {
+        this.service = service;
     }
     public void setId(Long id) {
         this.id = id;

@@ -1,11 +1,14 @@
 package ifpe.edu.br.servsimples.servsimples;
 
 import ifpe.edu.br.servsimples.servsimples.controller.UserController;
-import ifpe.edu.br.servsimples.servsimples.model.User;
+import ifpe.edu.br.servsimples.servsimples.model.*;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+
+import java.util.List;
+import java.util.Random;
 
 @SpringBootTest
 class UserControllerTest {
@@ -47,6 +50,58 @@ class UserControllerTest {
         User restoredUserAfter = userRepo.findByCPF(USER_MOCK_CPF);
         assert restoredUserAfter == null;
     }
+    @Test
+    public void testeAddEvento(){
+        registerMockedUser();
+        User restoredUser = userRepo.findByCPF(USER_MOCK_CPF);
+        checkMockedUserInfo(restoredUser);
+
+        Service mockedService = getMockedService();
+        restoredUser.addService(mockedService);
+        userRepo.save(restoredUser);
+
+        User restoredUser2 = userRepo.findByCPF(USER_MOCK_CPF);
+
+        Agenda agenda = restoredUser2.getAgenda();
+        Event event = new Event();
+        event.setService(mockedService);
+        event.setEnd(100L);
+        event.setStart(50L);
+        event.setDescription("MEU VENTINHO");
+        event.setType(Event.TYPE_PUBLISH);
+        agenda.setEvent(event);
+        userRepo.save(restoredUser);
+
+        User restoredUser3 = userRepo.findByCPF(USER_MOCK_CPF);
+        userRepo.delete(restoredUser3);
+    }
+
+    private Event getMockedPublishEventFromService(Service mockedService) {
+        Random r = new Random();
+        Event event = new Event();
+        event.setType(Event.TYPE_PUBLISH);
+        event.setStart(r.nextLong());
+        event.setEnd(r.nextLong());
+        event.setDescription("FORNECIMENTO DE " + r.nextInt());
+        event.setService(mockedService);
+        return event;
+    }
+
+    private Service getMockedService() {
+        Random r = new Random();
+        Service service = new Service();
+        service.setName("LAVADEIRA:" + r.nextInt());
+        service.setCost(getMockedCost());
+        return service;
+    }
+
+    private Cost getMockedCost() {
+        Random r = new Random();
+        Cost cost = new Cost();
+        cost.setTime("hora");
+        cost.setValue("R$" + r.nextInt());
+        return cost;
+    }
 
     private void checkMockedUserInfo(User user) {
         assert user != null;
@@ -55,6 +110,14 @@ class UserControllerTest {
         assert user.getPassword().equals(USER_MOCK_PASSWORD);
         assert user.getUserName().equals(USER_MOCK_USERNAME);
         assert user.getUserType().equals(USER_MOCK_TYPE);
+    }
+
+    private void checkEvent(Event reference, Event test) {
+        assert test != null;
+        assert reference.getEnd().equals(test.getEnd());
+        assert reference.getStart().equals(test.getStart());
+        assert reference.getDescription().equals(test.getDescription());
+        assert reference.getType() == test.getType();
     }
 
     private void registerMockedUser() {

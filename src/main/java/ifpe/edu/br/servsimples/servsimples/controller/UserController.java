@@ -53,6 +53,27 @@ public class UserController {
         return getResponseEntityFrom(HttpStatus.FORBIDDEN, getErrorMessageByCode(validationCode));
     }
 
+    @CrossOrigin("*")
+    @PostMapping("api/update/user")
+    public ResponseEntity<String> updateUser(@RequestBody User user) {
+
+        return getResponseEntityFrom(HttpStatus.FORBIDDEN, getErrorMessageByCode(10));
+    }
+
+    @CrossOrigin("*")
+    @PostMapping("api/register/service")
+    public ResponseEntity<String> registerService(@RequestBody User user) {
+
+        return getResponseEntityFrom(HttpStatus.FORBIDDEN, getErrorMessageByCode(10));
+    }
+
+    @CrossOrigin("*")
+    @PostMapping("api/unregister/service")
+    public ResponseEntity<String> unregisterService(@RequestBody User user) {
+
+        return getResponseEntityFrom(HttpStatus.FORBIDDEN, getErrorMessageByCode(10));
+    }
+
     private ResponseEntity<String> getResponseEntityFrom(HttpStatus status, Object object) {
         return ResponseEntity.status(status)
                 .contentType(MediaType.APPLICATION_JSON)

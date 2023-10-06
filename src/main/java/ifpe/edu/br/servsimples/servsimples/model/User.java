@@ -20,10 +20,10 @@ public class User {
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_wallet_id", referencedColumnName = "wallet_id", nullable = false)
     private final Wallet wallet = new Wallet();
-    @OneToMany(fetch = FetchType.EAGER)
+    @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinColumn(name = "user_notifications_id", nullable = false)
     private final List<Notification> notifications = new ArrayList<>();
-    @OneToMany(fetch = FetchType.EAGER)
+    @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinColumn(name = "user_services_id", nullable = false)
     private final List<Service> services = new ArrayList<>();
     @Column(nullable = false)
@@ -42,6 +42,13 @@ public class User {
         USER, PROFESSIONAL, ADMIN
     }
 
+    public void addService(Service service) {
+        this.services.add(service);
+    }
+
+    public void removeService(Service service) {
+        this.services.remove(service);
+    }
     public void setUserType(UserType userType) {
         this.userType = userType;
     }
