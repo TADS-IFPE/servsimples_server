@@ -37,6 +37,7 @@ public class Event implements Subscriber {
     public void setService(Service service) {
         this.service = service;
     }
+
     public void setId(Long id) {
         this.id = id;
     }

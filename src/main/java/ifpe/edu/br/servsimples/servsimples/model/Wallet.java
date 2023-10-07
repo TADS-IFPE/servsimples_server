@@ -17,6 +17,7 @@ public class Wallet {
     public boolean pay() {
         return false;
     }
+
     public Wallet() {
     }
 

@@ -49,6 +49,7 @@ public class User {
     public void removeService(Service service) {
         this.services.remove(service);
     }
+
     public void setUserType(UserType userType) {
         this.userType = userType;
     }

@@ -4,16 +4,16 @@ import com.google.gson.Gson;
 import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
 import ifpe.edu.br.servsimples.servsimples.dao.ServiceManager;
 import ifpe.edu.br.servsimples.servsimples.dao.UserManager;
-import ifpe.edu.br.servsimples.servsimples.model.Service;
 import ifpe.edu.br.servsimples.servsimples.model.User;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class UserController {
@@ -68,20 +68,34 @@ public class UserController {
             restoredUser.setPassword(user.getPassword());
             restoredUser.setName(user.getName());
             userRepo.save(restoredUser);
-            return getResponseEntityFrom(HttpStatus.OK, restoredUser);
+            return getResponseEntityFrom(HttpStatus.OK, userRepo.findByCPF(user.getCPF()));
         }
         return getResponseEntityFrom(HttpStatus.FORBIDDEN, getErrorMessageByCode(validationCode));
     }
 
     @CrossOrigin("*")
-    @PostMapping("api/register/service")
-    public ResponseEntity<String> registerService(@RequestBody User user) {
-        ServSimplesApplication.logi(TAG, "registerService: body received:" + new Gson().toJson(user));
+    @PostMapping("api/get/user")
+    public ResponseEntity<String> getUSer(@RequestBody User user) {
+        ServSimplesApplication.logi(TAG, "getUSer:");
         int userValidationCode = mUserManager.getUserValidationCode(user);
         if (userValidationCode == UserManager.USER_EXISTS) {
+            return getResponseEntityFrom(HttpStatus.OK, userRepo.findByCPF(user.getCPF()));
+        }
+        return getResponseEntityFrom(HttpStatus.FORBIDDEN, getErrorMessageByCode(userValidationCode));
+    }
+
+    @CrossOrigin("*")
+    @PostMapping("api/register/service")
+    public ResponseEntity<String> registerService(@RequestBody User user) {
+        ServSimplesApplication.logi(TAG, "registerService:");
+        int userValidationCode = mUserManager.getUserValidationCode(user);
+        if (userValidationCode == UserManager.USER_EXISTS) {
+            User restoredUser = userRepo.findByCPF(user.getCPF());
+            if (!restoredUser.getUserType().equals(User.UserType.PROFESSIONAL)) {
+                return getResponseEntityFrom(HttpStatus.FORBIDDEN, getErrorMessageByCode(UserManager.USER_NOT_ALLOWED));
+            }
             int serviceValidationCode = mServiceManager.getServiceValidationCode(user.getServices());
             if (serviceValidationCode == ServiceManager.SERVICE_VALID) {
-                User restoredUser = userRepo.findByCPF(user.getCPF());
                 restoredUser.addService(user.getServices().get(0));
                 userRepo.save(restoredUser);
                 return getResponseEntityFrom(HttpStatus.OK, restoredUser);
@@ -113,6 +127,7 @@ public class UserController {
             case UserManager.USER_NULL -> "USER IS NULL";
             case UserManager.USER_EXISTS -> "USER EXISTS";
             case UserManager.USER_NOT_EXISTS -> "USER NOT EXISTS";
+            case UserManager.USER_NOT_ALLOWED -> "USER NOT ALLOWED";
 
             case ServiceManager.SERVICE_COST_IS_NULL -> "SERVICE COST IS NULL";
             case ServiceManager.SERVICE_VALUE_ERROR -> "SERVICE VALUE ERROR";

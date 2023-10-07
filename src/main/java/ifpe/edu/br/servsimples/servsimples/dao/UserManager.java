@@ -12,6 +12,7 @@ public class UserManager {
     public static final int ERROR_CPF = 4;
     public static final int USER_EXISTS = 5;
     public static final int USER_NULL = 6;
+    public static final int USER_NOT_ALLOWED = 7;
 
 
     private final UserRepo userRepo;

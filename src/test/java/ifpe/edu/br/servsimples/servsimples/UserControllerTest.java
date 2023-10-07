@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.ResponseEntity;
 
 import java.util.List;
 import java.util.Random;
@@ -19,9 +18,11 @@ import static ifpe.edu.br.servsimples.servsimples.ServSimplesApplication.MAIN_TA
 class UserControllerTest {
 
     private static final Logger logger = LoggerFactory.getLogger(ServSimplesApplication.class);
-    private static void logi(String tag, String message){
-        logger.info("[" + MAIN_TAG + "] : ["+ tag + "] :" + message);
+
+    private static void logi(String tag, String message) {
+        logger.info("[" + MAIN_TAG + "] : [" + tag + "] :" + message);
     }
+
     private static final String TAG = UserControllerTest.class.getSimpleName();
 
     public static final String EVENT_MOCK_DESCRIPTION = "DESCRIPTION";
@@ -62,27 +63,47 @@ class UserControllerTest {
 
     @Test
     public void registerServiceTest() {
+        final String SERVICE_NAME_MOCK = "NOME DO SERVIÇO MOCK";
+        final String COST_TIME_MOCK = "HORA";
+        final String COST_VALUE_MOCK = "R$59,99";
         Cost cost = new Cost();
-        cost.setTime("HORA");
-        cost.setValue("R$50,00");
+        cost.setTime(COST_TIME_MOCK);
+        cost.setValue(COST_VALUE_MOCK);
 
         registerMockedUser();
+        updateMockedUserType(User.UserType.PROFESSIONAL);
         User restoredUser = userRepo.findByCPF(USER_MOCK_CPF);
 
         Service service = new Service();
-        service.setName("NOME DO SERVICO MOCK");
+        service.setName(SERVICE_NAME_MOCK);
         service.setCost(cost);
 
         restoredUser.addService(service);
 
         userController.registerService(restoredUser);
         restoredUser = userRepo.findByCPF(USER_MOCK_CPF);
+
+        // CHECK
+        List<Service> services = restoredUser.getServices();
+        assert !services.isEmpty();
+        assert services.size() == 1;
+        assert services.get(0).getCost() != null;
+        assert services.get(0).getName().equals(SERVICE_NAME_MOCK);
+        assert services.get(0).getCost().getValue().equals(COST_VALUE_MOCK);
+        assert services.get(0).getCost().getTime().equals(COST_TIME_MOCK);
+
         userRepo.delete(restoredUser);
     }
 
+    private void updateMockedUserType(User.UserType userType) {
+        User restoredUser = userRepo.findByCPF(USER_MOCK_CPF);
+        restoredUser.setUserType(userType);
+        userController.updateUser(restoredUser);
+    }
+
+
     @Deprecated
-    @Test
-    public void testeAddEvento(){
+    public void testeAddEvento() {
         registerMockedUser();
         User restoredUser = userRepo.findByCPF(USER_MOCK_CPF);
         checkMockedUserInfo(restoredUser);

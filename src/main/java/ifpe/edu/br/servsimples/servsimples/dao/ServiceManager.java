@@ -21,8 +21,9 @@ public class ServiceManager {
         if (name == null || name.isEmpty() || name.isBlank()) return SERVICE_NAME_ERROR;
         Cost cost = service.getCost();
         if (cost == null) return SERVICE_COST_IS_NULL;
-        if (cost.getTime() == null ||cost.getTime().isBlank() || cost.getTime().isEmpty()) return SERVICE_COST_ERROR;
-        if (cost.getValue() == null || cost.getValue().isEmpty() || cost.getValue().isBlank()) return SERVICE_VALUE_ERROR;
+        if (cost.getTime() == null || cost.getTime().isBlank() || cost.getTime().isEmpty()) return SERVICE_COST_ERROR;
+        if (cost.getValue() == null || cost.getValue().isEmpty() || cost.getValue().isBlank())
+            return SERVICE_VALUE_ERROR;
         return SERVICE_VALID;
     }
 
