@@ -4,15 +4,24 @@ import ifpe.edu.br.servsimples.servsimples.controller.UserController;
 import ifpe.edu.br.servsimples.servsimples.model.*;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.ResponseEntity;
 
 import java.util.List;
 import java.util.Random;
 
+import static ifpe.edu.br.servsimples.servsimples.ServSimplesApplication.MAIN_TAG;
+
 @SpringBootTest
 class UserControllerTest {
 
+    private static final Logger logger = LoggerFactory.getLogger(ServSimplesApplication.class);
+    private static void logi(String tag, String message){
+        logger.info("[" + MAIN_TAG + "] : ["+ tag + "] :" + message);
+    }
     private static final String TAG = UserControllerTest.class.getSimpleName();
 
     public static final String EVENT_MOCK_DESCRIPTION = "DESCRIPTION";
@@ -50,6 +59,28 @@ class UserControllerTest {
         User restoredUserAfter = userRepo.findByCPF(USER_MOCK_CPF);
         assert restoredUserAfter == null;
     }
+
+    @Test
+    public void registerServiceTest() {
+        Cost cost = new Cost();
+        cost.setTime("HORA");
+        cost.setValue("R$50,00");
+
+        registerMockedUser();
+        User restoredUser = userRepo.findByCPF(USER_MOCK_CPF);
+
+        Service service = new Service();
+        service.setName("NOME DO SERVICO MOCK");
+        service.setCost(cost);
+
+        restoredUser.addService(service);
+
+        userController.registerService(restoredUser);
+        restoredUser = userRepo.findByCPF(USER_MOCK_CPF);
+        userRepo.delete(restoredUser);
+    }
+
+    @Deprecated
     @Test
     public void testeAddEvento(){
         registerMockedUser();
