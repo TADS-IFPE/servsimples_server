@@ -1,4 +1,4 @@
-package ifpe.edu.br.servsimples.servsimples.dao;
+package ifpe.edu.br.servsimples.servsimples.managers;
 
 import ifpe.edu.br.servsimples.servsimples.model.Cost;
 import ifpe.edu.br.servsimples.servsimples.model.Service;

@@ -37,9 +37,19 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private UserType userType = UserType.USER;
+    @Transient
+    private String token;
 
     public enum UserType {
         USER, PROFESSIONAL, ADMIN
+    }
+
+    public String getTokenString() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
     }
 
     public void addService(Service service) {

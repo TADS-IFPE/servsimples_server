@@ -1,6 +1,6 @@
 package ifpe.edu.br.servsimples.servsimples;
 
-import ifpe.edu.br.servsimples.servsimples.controller.UserController;
+import ifpe.edu.br.servsimples.servsimples.controller.MainController;
 import ifpe.edu.br.servsimples.servsimples.model.*;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
 import org.junit.jupiter.api.Test;
@@ -35,12 +35,12 @@ class UserControllerTest {
     private final String USER_MOCK_PASSWORD = "PASSWORD";
     private final String USER_MOCK_NAME = "NAME";
     private final UserRepo userRepo;
-    private final UserController userController;
+    private final MainController userController;
 
     @Autowired
     public UserControllerTest(UserRepo userRepo) {
         this.userRepo = userRepo;
-        userController = new UserController(userRepo);
+        userController = new MainController(userRepo);
     }
 
     @Test
