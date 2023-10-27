@@ -37,7 +37,7 @@ public class MainController {
 
     @PostMapping("api/register/user")
     public ResponseEntity<String> registerUser(@RequestBody User user) {
-        ServSimplesApplication.logi(TAG, "registerUser");
+        ServSimplesApplication.logi(TAG, "registerUser: " + showUserInfo(user));
         int validationCode = mUserManager.getUserValidationCode(user);
         if (validationCode == UserManager.USER_VALID) {
             User restoredUser = userRepo.findByCPF(user.getCPF());
@@ -222,5 +222,19 @@ public class MainController {
 
             default -> "NOT MAPPED ERROR";
         };
+    }
+
+    private String showUserInfo(User user) {
+        if (user == null) {
+            return "user is null";
+        }
+        String response = "";
+        response += "name:" + user.getName();
+        response += " username:" + user.getUserName();
+        response += " cpf:" + user.getCPF();
+        response += " password:" + user.getPassword();
+        response += " token:" + user.getToken();
+        response += " type:" + user.getUserType();
+        return response;
     }
 }
