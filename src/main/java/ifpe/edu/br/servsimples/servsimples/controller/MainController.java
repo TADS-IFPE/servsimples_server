@@ -1,6 +1,7 @@
 package ifpe.edu.br.servsimples.servsimples.controller;
 
 import com.google.gson.Gson;
+import ifpe.edu.br.servsimples.servsimples.InterfacesWrapper;
 import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
 import ifpe.edu.br.servsimples.servsimples.autentication.Token;
 import ifpe.edu.br.servsimples.servsimples.managers.AuthManager;
@@ -27,136 +28,115 @@ public class MainController {
     private final UserRepo userRepo;
     private final UserManager mUserManager;
     private final ServiceManager mServiceManager;
+    private final AuthManager mAuthManager;
 
     @Autowired
     public MainController(UserRepo userController) {
         this.userRepo = userController;
         mUserManager = new UserManager(userRepo);
         mServiceManager = new ServiceManager();
+        mAuthManager = AuthManager.getInstance();
     }
 
     @PostMapping("api/register/user")
     public ResponseEntity<String> registerUser(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "registerUser: " + showUserInfo(user));
-        int validationCode = mUserManager.getUserValidationCode(user);
+        int validationCode = mUserManager.getUserInfoValidationCode(user);
         if (validationCode == UserManager.USER_VALID) {
-            User restoredUser = userRepo.findByCPF(user.getCPF());
+            User restoredUser = mUserManager.getUserByCPF(user.getCPF());
             if (restoredUser != null) {
-                return getResponseEntityFrom(HttpStatus.FORBIDDEN,
+                return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_EXISTS,
                         getErrorMessageByCode(UserManager.USER_EXISTS));
             }
-            Token token = AuthManager.getToken(user, true);
-            userRepo.save(user);
-            user.setToken(token.getEncryptedToken());
-            return getResponseEntityFrom(HttpStatus.OK, user);
+            Token token = mAuthManager.getTokenForUser(user, true);
+            User responseUser = new User();
+            responseUser.setToken(token.getEncryptedToken());
+            mUserManager.save(user);
+            return getResponseEntityFrom(HttpStatus.OK, responseUser);
         }
-        return getResponseEntityFrom(HttpStatus.FORBIDDEN, getErrorMessageByCode(validationCode));
+        return getResponseEntityFrom(HttpStatus.FORBIDDEN,
+                getErrorMessageByCode(validationCode));
     }
 
     @PostMapping("api/login")
     public ResponseEntity<String> login(@RequestBody User user) {
-        ServSimplesApplication.logi(TAG, "login:");
-        int userValidationCode = mUserManager.getUserValidationCode(user);
+        ServSimplesApplication.logi(TAG, "login:" + showUserInfo(user));
+        int userValidationCode = mUserManager.getLoginInfoValidationCode(user);
         if (userValidationCode == UserManager.USER_VALID) {
-            User restoredUser = userRepo.findByCPF(user.getCPF());
+            User restoredUser = mUserManager.getUserByUsername(user.getUserName());
             if (restoredUser == null) {
-                return getResponseEntityFrom(HttpStatus.FORBIDDEN,
+                return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                         getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
             }
-            int tokenValidationCodeForUser = AuthManager.getTokenValidationCodeForUser(user, restoredUser);
-            if (tokenValidationCodeForUser == AuthManager.TOKEN_VALID) {
-                return getResponseEntityFrom(HttpStatus.FORBIDDEN,
-                        getErrorMessageByCode(AuthManager.USER_ALREADY_LOGGED_IN));
+            int loginValidationCode = mAuthManager.getLoginValidationCode(user, restoredUser);
+            if (loginValidationCode == AuthManager.USER_INFO_NOT_MATCH) {
+                return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_INFO_NOT_MATCH,
+                        getErrorMessageByCode(AuthManager.USER_INFO_NOT_MATCH));
             }
-            if (restoredUser.getUserName().equals(user.getUserName()) &&
-                    restoredUser.getPassword().equals(user.getPassword())) {
-                Token token = AuthManager.getToken(user, true);
-                user.setToken(token.getEncryptedToken());
-                return getResponseEntityFrom(HttpStatus.OK, user);
-            } else {
-                return getResponseEntityFrom(HttpStatus.FORBIDDEN,
-                        getErrorMessageByCode(tokenValidationCodeForUser));
-            }
+            Token token = mAuthManager.getTokenForUser(user, true);
+            User responseUser = new User();
+            responseUser.setToken(token.getEncryptedToken());
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.OK, responseUser);
         }
-        return getResponseEntityFrom(HttpStatus.FORBIDDEN,
+        return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_INVALID,
                 getErrorMessageByCode(userValidationCode));
     }
 
     @PostMapping("api/get/user")
     public ResponseEntity<String> getUSer(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "getUSer:");
-        int userValidationCode = mUserManager.getUserValidationCode(user);
-        if (userValidationCode == UserManager.USER_VALID) {
-            User restoredUser = userRepo.findByCPF(user.getCPF());
-            if (restoredUser == null) {
-                return getResponseEntityFrom(HttpStatus.FORBIDDEN,
-                        getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
-            }
-            int tokenValidationCodeForUser = AuthManager.getTokenValidationCodeForUser(user, restoredUser);
-            if (tokenValidationCodeForUser == AuthManager.TOKEN_VALID) {
-                return getResponseEntityFrom(HttpStatus.OK, restoredUser);
-            }
-            return getResponseEntityFrom(HttpStatus.FORBIDDEN,
-                    getErrorMessageByCode(tokenValidationCodeForUser));
+        User restoredUser = mUserManager.getUserByCPF(user.getCPF());
+        if (restoredUser == null) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
+                    getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
-        return getResponseEntityFrom(HttpStatus.FORBIDDEN,
-                getErrorMessageByCode(userValidationCode));
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+        return mAuthManager.handleTokenValidation(() -> restoredUser, tokenValidationCode);
     }
 
     @PostMapping("api/unregister/user")
     public ResponseEntity<String> unregisterUser(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "unregisterUser");
-        int userValidationCode = mUserManager.getUserValidationCode(user);
-        if (userValidationCode == UserManager.USER_VALID) {
-            User restoredUser = userRepo.findByCPF(user.getCPF());
-            if (restoredUser == null) {
-                return getResponseEntityFrom(HttpStatus.FORBIDDEN,
-                        getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
-            }
-            int tokenValidationCodeForUser = AuthManager.getTokenValidationCodeForUser(user, restoredUser);
-            if (tokenValidationCodeForUser == AuthManager.TOKEN_VALID) {
-                userRepo.delete(restoredUser);
-                return getResponseEntityFrom(HttpStatus.OK, restoredUser);
-            } else {
-                return getResponseEntityFrom(HttpStatus.FORBIDDEN,
-                        getErrorMessageByCode(tokenValidationCodeForUser));
-            }
+        User restoredUser = mUserManager.getUserByCPF(user.getCPF());
+        if (restoredUser == null) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
+                    getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
-        return getResponseEntityFrom(HttpStatus.FORBIDDEN, getErrorMessageByCode(userValidationCode));
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+        return mAuthManager.handleTokenValidation(() -> {
+            mUserManager.removeUser(restoredUser);
+            return null;
+        }, tokenValidationCode);
     }
 
     @PostMapping("api/update/user")
     public ResponseEntity<String> updateUser(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "updateUser");
-        int userValidationCode = mUserManager.getUserValidationCode(user);
-        if (userValidationCode == UserManager.USER_VALID) {
-            User restoredUser = userRepo.findByCPF(user.getCPF());
-            if (restoredUser == null) {
-                return getResponseEntityFrom(HttpStatus.FORBIDDEN,
-                        getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
-            }
-            int tokenValidationCodeForUser = AuthManager.getTokenValidationCodeForUpdateUser(user, restoredUser);
-            if (tokenValidationCodeForUser == AuthManager.TOKEN_VALID) {
-                restoredUser.setUserType(user.getUserType());
-                restoredUser.setUserName(user.getUserName());
-                restoredUser.setPassword(user.getPassword());
-                restoredUser.setName(user.getName());
-                userRepo.save(restoredUser);
-                Token token = AuthManager.getToken(user, true);
-                user.setToken(token.getEncryptedToken());
-                return getResponseEntityFrom(HttpStatus.OK, user);
-            } else {
-                return getResponseEntityFrom(HttpStatus.FORBIDDEN,
-                        getErrorMessageByCode(tokenValidationCodeForUser));
-            }
+        User restoredUser = mUserManager.getUserByCPF(user.getCPF());
+        if (restoredUser == null) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
+                    getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
-        return getResponseEntityFrom(HttpStatus.FORBIDDEN, getErrorMessageByCode(userValidationCode));
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+        return mAuthManager.handleTokenValidation(() -> {
+            restoredUser.setUserName(user.getUserName());
+            restoredUser.setPassword(user.getPassword());
+            restoredUser.setUserType(user.getUserType());
+            restoredUser.setName(user.getName());
+            mUserManager.updateUser(restoredUser);
+
+            Token token = mAuthManager.getTokenForUser(restoredUser, true);
+            User responseUser = new User();
+            responseUser.setToken(token.getEncryptedToken());
+            responseUser.setUserType(user.getUserType());
+            return responseUser;
+        }, tokenValidationCode);
     }
 
     @PostMapping("api/register/service")
     public ResponseEntity<String> registerService(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "registerService:");
-        int userValidationCode = mUserManager.getUserValidationCode(user);
+        int userValidationCode = mUserManager.getUserInfoValidationCode(user);
         if (userValidationCode == UserManager.USER_EXISTS) {
             User restoredUser = userRepo.findByCPF(user.getCPF());
             if (!restoredUser.getUserType().equals(User.UserType.PROFESSIONAL)) {
@@ -185,7 +165,7 @@ public class MainController {
                 .body(new Gson().toJson(object));
     }
 
-    private String getErrorMessageByCode(int code) {
+    public static String getErrorMessageByCode(int code) {
         return switch (code) {
             // USER
             case UserManager.ERROR_USERNAME -> "USERNAME ERROR";
@@ -199,6 +179,9 @@ public class MainController {
             case UserManager.USER_VALID -> "USER VALID";
             case UserManager.PASSWORD_MISMATCH -> "PASSWORD MISMATCH";
             case UserManager.USERNAME_MISMATCH -> "USERNAME MISMATCH";
+            case UserManager.MISSING_LOGIN_INFO -> "MISSING LOGIN INFO";
+            case UserManager.LOGIN_INFO_LENGTH_ERROR -> "LOGIN INFO LENGTH ERROR";
+            case UserManager.USER_INFO_DUPLICATED -> "USER INFO DUPLICATED";
 
             // SERVICE
             case ServiceManager.SERVICE_COST_IS_NULL -> "SERVICE COST IS NULL";
@@ -219,6 +202,8 @@ public class MainController {
             case AuthManager.TOKEN_EXPIRED -> "TOKEN EXPIRED";
             case AuthManager.USER_NOT_LOGGED_IN -> "USER NOT LOGGED IN";
             case AuthManager.USER_ALREADY_LOGGED_IN -> "USER ALREADY LOGGED IN";
+            case AuthManager.USER_INFO_NOT_MATCH -> "USER INFO NOT MATCH";
+            case AuthManager.TOKEN_DECRYPT_FAILURE -> "TOKEN DECRYPT FAILURE";
 
             default -> "NOT MAPPED ERROR";
         };

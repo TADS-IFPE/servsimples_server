@@ -44,6 +44,12 @@ public class User {
         USER, PROFESSIONAL, ADMIN
     }
 
+    /** This method *MUST* be called when getting token
+     * instead a #getToken() method
+     *
+     *
+     * @return the token in String format
+     */
     public String getTokenString() {
         return token;
     }

@@ -15,7 +15,7 @@ public class Token {
         long timestamp = builder.timeStamp;
         boolean sessionState = builder.sessionState;
         User user = builder.user;
-        this.encryptedToken = AuthManager.encrypt(user.getUserName()
+        this.encryptedToken = AuthManager.getInstance().encrypt(user.getUserName()
                 + ":" + user.getPassword() + "*" + timestamp + "$" + sessionState + "#");
     }
 

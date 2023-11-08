@@ -17,6 +17,9 @@ public class UserManager {
     public static final int PASSWORD_MISMATCH = 8;
     public static final int USERNAME_MISMATCH = 9;
     public static final int USER_NOT_EXISTS = 10;
+    public static final int MISSING_LOGIN_INFO = 11;
+    public static final int LOGIN_INFO_LENGTH_ERROR = 12;
+    public static final int USER_INFO_DUPLICATED = 13;
 
 
     private final UserRepo userRepo;
@@ -25,7 +28,7 @@ public class UserManager {
         this.userRepo = userRepo;
     }
 
-    public int getUserValidationCode(User user) {
+    public int getUserInfoValidationCode(User user) {
         if (user == null) return USER_NULL;
         if (user.getUserName() == null || user.getUserName().isEmpty() || user.getUserName().isBlank() || user.getUserName().length() != 64) {
             return ERROR_USERNAME;
@@ -39,6 +42,51 @@ public class UserManager {
         if (user.getName() == null || user.getName().isEmpty() || user.getName().isBlank()) {
             return ERROR_NAME;
         }
+        if (user.getPassword().equals(user.getUserName()) || user.getCPF().equals(user.getUserName()) ||
+        user.getCPF().equals(user.getPassword())) {
+            return USER_INFO_DUPLICATED;
+        }
         return USER_VALID;
+    }
+
+
+    public int getLoginInfoValidationCode(User user) {
+        String userName = user.getUserName();
+        String password = user.getPassword();
+
+        if (userName.isEmpty() || userName.isBlank() || password.isEmpty() || password.isBlank()) {
+            return MISSING_LOGIN_INFO;
+        }
+
+        if (userName.length() != 64 || password.length() != 64) {
+            return LOGIN_INFO_LENGTH_ERROR;
+        }
+
+        return USER_VALID;
+    }
+
+    public boolean userExists(User user) {
+
+        return false;
+    }
+
+    public User getUserByCPF(String cpf) {
+        return userRepo.findByCPF(cpf);
+    }
+
+    public void removeUser(User restoredUser) {
+        userRepo.delete(restoredUser);
+    }
+
+    public void updateUser(User restoredUser) {
+        save(restoredUser);
+    }
+
+    public void save(User user) {
+        userRepo.save(user);
+    }
+
+    public User getUserByUsername(String userName) {
+        return userRepo.findByUserName(userName);
     }
 }

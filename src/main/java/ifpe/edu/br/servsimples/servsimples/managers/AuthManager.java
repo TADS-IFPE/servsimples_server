@@ -1,8 +1,11 @@
 package ifpe.edu.br.servsimples.servsimples.managers;
 
+import ifpe.edu.br.servsimples.servsimples.InterfacesWrapper;
 import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
 import ifpe.edu.br.servsimples.servsimples.autentication.Token;
+import ifpe.edu.br.servsimples.servsimples.controller.MainController;
 import ifpe.edu.br.servsimples.servsimples.model.User;
+import org.springframework.http.ResponseEntity;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -10,7 +13,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.util.Base64;
 import java.util.Date;
 
-public class AuthManager {
+public class AuthManager extends Manager{
 
     private static final String MASTER_KEY = "serv?simpl3sK3yifp3202eT@d5w1ll#";
     private static final String TAG = AuthManager.class.getSimpleName();
@@ -25,8 +28,30 @@ public class AuthManager {
     public static final int USER_NOT_LOGGED_IN = 205;
     public static final int TOKEN_EXPIRED = 206;
     public static final int USER_ALREADY_LOGGED_IN = 207;
+    public static final int USER_INFO_MATCH = 208;
+    public static final int USER_INFO_NOT_MATCH = 209;
+    public static final int TOKEN_DECRYPT_FAILURE = 210;
 
-    public static String encrypt(String content) {
+    private static AuthManager instance;
+
+    public static AuthManager getInstance() {
+        if (instance == null) {
+            instance = new AuthManager();
+        }
+        return instance;
+    }
+
+    private AuthManager() {
+
+    }
+
+    /**
+     * Move to cryptohelper class
+     * @param content
+     * @return
+     */
+    @Deprecated
+    public String encrypt(String content) {
         try {
             SecretKey secretKey = new SecretKeySpec(MASTER_KEY.getBytes(), "AES");
             Cipher cipher = Cipher.getInstance("AES");
@@ -39,7 +64,37 @@ public class AuthManager {
         }
     }
 
-    private static String decrypt(String encryptedText) {
+    public ResponseEntity<String> handleTokenValidation(InterfacesWrapper.ITokenValidation func,
+                                                        int tokenValidationCode) {
+        ResponseEntity<String> response = null;
+        switch (tokenValidationCode) {
+            case AuthManager.TOKEN_VALID -> {
+                Object result = func.onSuccess();
+                response = getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.OK, result);
+            }
+            case AuthManager.TOKEN_NOT_PRESENT ->
+                    response = getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.TOKEN_NOT_PRESENT,
+                            MainController.getErrorMessageByCode(tokenValidationCode));
+            case AuthManager.TOKEN_DECRYPT_FAILURE ->
+                    response = getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.TOKEN_DECRYPT_FAILURE,
+                            MainController.getErrorMessageByCode(tokenValidationCode));
+            case AuthManager.USERNAME_INVALID ->
+                    response = getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USERNAME_INVALID,
+                            MainController.getErrorMessageByCode(tokenValidationCode));
+            case AuthManager.PASSWORD_INVALID ->
+                    response = getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.PASSWORD_INVALID,
+                            MainController.getErrorMessageByCode(tokenValidationCode));
+            case AuthManager.TOKEN_EXPIRED ->
+                    response = getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.TOKEN_EXPIRED,
+                            MainController.getErrorMessageByCode(tokenValidationCode));
+        }
+        return response;
+    }
+
+
+
+
+    private String decrypt(String encryptedText) {
         try {
             SecretKey secretKey = new SecretKeySpec(MASTER_KEY.getBytes(), "AES");
             Cipher cipher = Cipher.getInstance("AES");
@@ -51,14 +106,15 @@ public class AuthManager {
         }
     }
 
-    public static Token getToken(User user, boolean isUserLoggedIn) {
+    public Token getTokenForUser(User user, boolean isUserLoggedIn) {
         return new Token.Builder(user)
                 .addState(isUserLoggedIn)
                 .addTimeStamp(new Date().getTime())
                 .build();
     }
 
-    public static int getTokenValidationCodeForUser(User userFromRequest, User restoredUser) {
+    @Deprecated
+    public int getTokenValidationCodeForUser(User userFromRequest, User restoredUser) {
         String token = userFromRequest.getTokenString();
         if (token == null || token.isEmpty()) {
             return TOKEN_NOT_PRESENT;
@@ -93,6 +149,7 @@ public class AuthManager {
         return TOKEN_VALID;
     }
 
+
     /**
      * This API is a workaround to verify the token just when updating a user
      *
@@ -101,7 +158,8 @@ public class AuthManager {
      *
      * @return the token validation code
      */
-    public static int getTokenValidationCodeForUpdateUser(User userFromRequest, User restoredUser) {
+    @Deprecated
+    public int getTokenValidationCodeForUpdateUser(User userFromRequest, User restoredUser) {
         String token = userFromRequest.getTokenString();
         if (token == null || token.isEmpty()) {
             return TOKEN_NOT_PRESENT;
@@ -134,5 +192,64 @@ public class AuthManager {
         long delta = now - timeStampLong;
         if (delta > (ONE_DAY)) return TOKEN_EXPIRED;
         return TOKEN_VALID;
+    }
+
+    public int getLoginValidationCode(User user, User restoredUser) {
+        if (restoredUser.getPassword().equals(user.getPassword()) &&
+                restoredUser.getUserName().equals(user.getUserName())) {
+            return USER_INFO_MATCH;
+        }
+        else {
+            return USER_INFO_NOT_MATCH;
+        }
+    }
+
+    public int getTokenValidationCode(User restoredUser, String token) {
+        if (token == null || token.isEmpty()) {
+            return TOKEN_NOT_PRESENT;
+        }
+
+        String decryptedToken = decrypt(token);
+        if (decryptedToken == null) {
+            return TOKEN_DECRYPT_FAILURE;
+        }
+
+        String username = getUserNameFromDecryptedToken(decryptedToken);
+        String password = getPasswordFromDecryptedToken(decryptedToken);
+
+        if (!restoredUser.getUserName().equals(username)) return USERNAME_INVALID;
+        if (!restoredUser.getPassword().equals(password)) return PASSWORD_INVALID;
+
+        Long timeStampLong = Long.valueOf(getTimestampFromDecryptedToken(decryptedToken));
+        Long now = new Date().getTime();
+        long delta = now - timeStampLong;
+        if (delta > (ONE_DAY)) return TOKEN_EXPIRED;
+
+        return TOKEN_VALID;
+    }
+
+    private String getUserNameFromDecryptedToken(String decryptedToken) {
+        int usernameStartIndex = decryptedToken.indexOf("%");
+        int passwordStartIndex = decryptedToken.indexOf(":");
+        return decryptedToken.substring(usernameStartIndex + 1, passwordStartIndex);
+    }
+
+    private String getPasswordFromDecryptedToken(String decryptedToken) {
+        int passwordStartIndex = decryptedToken.indexOf(":");
+        int timestampStartIndex = decryptedToken.indexOf("*");
+        return decryptedToken.substring(passwordStartIndex + 1, timestampStartIndex);
+    }
+
+    private String getTimestampFromDecryptedToken(String decryptedToken) {
+        int timestampStartIndex = decryptedToken.indexOf("*");
+        int stateStartIndex = decryptedToken.indexOf("$");
+        return decryptedToken.substring(timestampStartIndex + 1, stateStartIndex);
+    }
+
+    private boolean getSessionStateFromDecryptedToken(String decryptedToken) {
+        int stateStartIndex = decryptedToken.indexOf("$");
+        int stateEndIndex = decryptedToken.indexOf("#");
+        String state = decryptedToken.substring(stateStartIndex + 1, stateEndIndex);
+        return state.equals("true");
     }
 }
