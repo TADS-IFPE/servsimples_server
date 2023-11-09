@@ -46,7 +46,7 @@ class UserControllerTest {
     @Test
     public void registerUserTest() {
         registerMockedUser();
-        User restoredUser = userRepo.findByCPF(USER_MOCK_CPF);
+        User restoredUser = userRepo.findByCpf(USER_MOCK_CPF);
         checkMockedUserInfo(restoredUser);
         userRepo.delete(restoredUser);
     }
@@ -54,10 +54,10 @@ class UserControllerTest {
     @Test
     public void unregisterUserTest() {
         registerMockedUser();
-        User restoredUserBefore = userRepo.findByCPF(USER_MOCK_CPF);
+        User restoredUserBefore = userRepo.findByCpf(USER_MOCK_CPF);
         checkMockedUserInfo(restoredUserBefore);
         userController.unregisterUser(restoredUserBefore);
-        User restoredUserAfter = userRepo.findByCPF(USER_MOCK_CPF);
+        User restoredUserAfter = userRepo.findByCpf(USER_MOCK_CPF);
         assert restoredUserAfter == null;
     }
 
@@ -72,7 +72,7 @@ class UserControllerTest {
 
         registerMockedUser();
         updateMockedUserType(User.UserType.PROFESSIONAL);
-        User restoredUser = userRepo.findByCPF(USER_MOCK_CPF);
+        User restoredUser = userRepo.findByCpf(USER_MOCK_CPF);
 
         Service service = new Service();
         service.setName(SERVICE_NAME_MOCK);
@@ -81,7 +81,7 @@ class UserControllerTest {
         restoredUser.addService(service);
 
         userController.registerService(restoredUser);
-        restoredUser = userRepo.findByCPF(USER_MOCK_CPF);
+        restoredUser = userRepo.findByCpf(USER_MOCK_CPF);
 
         // CHECK
         List<Service> services = restoredUser.getServices();
@@ -96,7 +96,7 @@ class UserControllerTest {
     }
 
     private void updateMockedUserType(User.UserType userType) {
-        User restoredUser = userRepo.findByCPF(USER_MOCK_CPF);
+        User restoredUser = userRepo.findByCpf(USER_MOCK_CPF);
         restoredUser.setUserType(userType);
         userController.updateUser(restoredUser);
     }
@@ -105,14 +105,14 @@ class UserControllerTest {
     @Deprecated
     public void testeAddEvento() {
         registerMockedUser();
-        User restoredUser = userRepo.findByCPF(USER_MOCK_CPF);
+        User restoredUser = userRepo.findByCpf(USER_MOCK_CPF);
         checkMockedUserInfo(restoredUser);
 
         Service mockedService = getMockedService();
         restoredUser.addService(mockedService);
         userRepo.save(restoredUser);
 
-        User restoredUser2 = userRepo.findByCPF(USER_MOCK_CPF);
+        User restoredUser2 = userRepo.findByCpf(USER_MOCK_CPF);
 
         Agenda agenda = restoredUser2.getAgenda();
         Event event = new Event();
@@ -124,7 +124,7 @@ class UserControllerTest {
         agenda.setEvent(event);
         userRepo.save(restoredUser);
 
-        User restoredUser3 = userRepo.findByCPF(USER_MOCK_CPF);
+        User restoredUser3 = userRepo.findByCpf(USER_MOCK_CPF);
         userRepo.delete(restoredUser3);
     }
 
@@ -158,7 +158,7 @@ class UserControllerTest {
     private void checkMockedUserInfo(User user) {
         assert user != null;
         assert user.getName().equals(USER_MOCK_NAME);
-        assert user.getCPF().equals(USER_MOCK_CPF);
+        assert user.getCpf().equals(USER_MOCK_CPF);
         assert user.getPassword().equals(USER_MOCK_PASSWORD);
         assert user.getUserName().equals(USER_MOCK_USERNAME);
         assert user.getUserType().equals(USER_MOCK_TYPE);
@@ -178,7 +178,7 @@ class UserControllerTest {
 
     private User getMockUser() {
         User user = new User();
-        user.setCPF(USER_MOCK_CPF);
+        user.setCpf(USER_MOCK_CPF);
         user.setName(USER_MOCK_NAME);
         user.setPassword(USER_MOCK_PASSWORD);
         user.setUserName(USER_MOCK_USERNAME);

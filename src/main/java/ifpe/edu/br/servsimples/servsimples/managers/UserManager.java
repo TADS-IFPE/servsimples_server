@@ -2,7 +2,6 @@ package ifpe.edu.br.servsimples.servsimples.managers;
 
 import ifpe.edu.br.servsimples.servsimples.model.User;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
-import org.springframework.http.ResponseEntity;
 
 public class UserManager {
 
@@ -30,20 +29,20 @@ public class UserManager {
 
     public int getUserInfoValidationCode(User user) {
         if (user == null) return USER_NULL;
-        if (user.getUserName() == null || user.getUserName().isEmpty() || user.getUserName().isBlank() || user.getUserName().length() != 64) {
+        if (user.getUserName() == null || user.getUserName().isEmpty() || user.getUserName().isBlank() /*|| user.getUserName().length() != 64*/) {
             return ERROR_USERNAME;
         }
-        if (user.getPassword() == null || user.getPassword().isEmpty() || user.getPassword().isBlank() || user.getPassword().length() != 64) {
+        if (user.getPassword() == null || user.getPassword().isEmpty() || user.getPassword().isBlank()/* || user.getPassword().length() != 64*/) {
             return ERROR_PASSWORD;
         }
-        if (user.getCPF() == null || user.getCPF().isEmpty() || user.getCPF().isBlank() || user.getCPF().length() != 64) {
+        if (user.getCpf() == null || user.getCpf().isEmpty() || user.getCpf().isBlank()/* || user.getCpf().length() != 64*/) {
             return ERROR_CPF;
         }
         if (user.getName() == null || user.getName().isEmpty() || user.getName().isBlank()) {
             return ERROR_NAME;
         }
-        if (user.getPassword().equals(user.getUserName()) || user.getCPF().equals(user.getUserName()) ||
-        user.getCPF().equals(user.getPassword())) {
+        if (user.getPassword().equals(user.getUserName()) || user.getCpf().equals(user.getUserName()) ||
+        user.getCpf().equals(user.getPassword())) {
             return USER_INFO_DUPLICATED;
         }
         return USER_VALID;
@@ -58,9 +57,9 @@ public class UserManager {
             return MISSING_LOGIN_INFO;
         }
 
-        if (userName.length() != 64 || password.length() != 64) {
-            return LOGIN_INFO_LENGTH_ERROR;
-        }
+//        if (userName.length() != 64 || password.length() != 64) {
+//            return LOGIN_INFO_LENGTH_ERROR;
+//        }
 
         return USER_VALID;
     }
@@ -71,7 +70,7 @@ public class UserManager {
     }
 
     public User getUserByCPF(String cpf) {
-        return userRepo.findByCPF(cpf);
+        return userRepo.findByCpf(cpf);
     }
 
     public void removeUser(User restoredUser) {

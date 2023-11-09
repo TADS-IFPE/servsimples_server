@@ -4,6 +4,6 @@ import ifpe.edu.br.servsimples.servsimples.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserRepo extends JpaRepository<User, Long> {
-    User findByCPF(String CPF);
+    User findByCpf(String CPF);
     User findByUserName(String Username);
 }

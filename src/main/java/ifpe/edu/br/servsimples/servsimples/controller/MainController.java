@@ -43,7 +43,7 @@ public class MainController {
         ServSimplesApplication.logi(TAG, "registerUser: " + showUserInfo(user));
         int validationCode = mUserManager.getUserInfoValidationCode(user);
         if (validationCode == UserManager.USER_VALID) {
-            User restoredUser = mUserManager.getUserByCPF(user.getCPF());
+            User restoredUser = mUserManager.getUserByCPF(user.getCpf());
             if (restoredUser != null) {
                 return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_EXISTS,
                         getErrorMessageByCode(UserManager.USER_EXISTS));
@@ -51,6 +51,9 @@ public class MainController {
             Token token = mAuthManager.getTokenForUser(user, true);
             User responseUser = new User();
             responseUser.setToken(token.getEncryptedToken());
+            responseUser.setCpf(user.getCpf());
+            responseUser.setUserType(user.getUserType());
+            responseUser.setName(user.getName());
             mUserManager.save(user);
             return getResponseEntityFrom(HttpStatus.OK, responseUser);
         }
@@ -59,7 +62,7 @@ public class MainController {
     }
 
     @PostMapping("api/login")
-    public ResponseEntity<String> login(@RequestBody User user) {
+    public ResponseEntity<String> login(@RequestBody User user ) {
         ServSimplesApplication.logi(TAG, "login:" + showUserInfo(user));
         int userValidationCode = mUserManager.getLoginInfoValidationCode(user);
         if (userValidationCode == UserManager.USER_VALID) {
@@ -76,6 +79,9 @@ public class MainController {
             Token token = mAuthManager.getTokenForUser(user, true);
             User responseUser = new User();
             responseUser.setToken(token.getEncryptedToken());
+            responseUser.setCpf(restoredUser.getCpf());
+            responseUser.setName(restoredUser.getName());
+            responseUser.setUserType(restoredUser.getUserType());
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.OK, responseUser);
         }
         return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_INVALID,
@@ -84,8 +90,8 @@ public class MainController {
 
     @PostMapping("api/get/user")
     public ResponseEntity<String> getUSer(@RequestBody User user) {
-        ServSimplesApplication.logi(TAG, "getUSer:");
-        User restoredUser = mUserManager.getUserByCPF(user.getCPF());
+        ServSimplesApplication.logi(TAG, "getUSer:" + showUserInfo(user));
+        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
         if (restoredUser == null) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
@@ -97,7 +103,7 @@ public class MainController {
     @PostMapping("api/unregister/user")
     public ResponseEntity<String> unregisterUser(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "unregisterUser");
-        User restoredUser = mUserManager.getUserByCPF(user.getCPF());
+        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
         if (restoredUser == null) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
@@ -111,8 +117,8 @@ public class MainController {
 
     @PostMapping("api/update/user")
     public ResponseEntity<String> updateUser(@RequestBody User user) {
-        ServSimplesApplication.logi(TAG, "updateUser");
-        User restoredUser = mUserManager.getUserByCPF(user.getCPF());
+        ServSimplesApplication.logi(TAG, "updateUser: " + showUserInfo(user));
+        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
         if (restoredUser == null) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
@@ -129,6 +135,9 @@ public class MainController {
             User responseUser = new User();
             responseUser.setToken(token.getEncryptedToken());
             responseUser.setUserType(user.getUserType());
+            responseUser.setUserName(user.getUserName());
+            responseUser.setCpf(user.getCpf());
+            responseUser.setName(user.getName());
             return responseUser;
         }, tokenValidationCode);
     }
@@ -138,7 +147,7 @@ public class MainController {
         ServSimplesApplication.logi(TAG, "registerService:");
         int userValidationCode = mUserManager.getUserInfoValidationCode(user);
         if (userValidationCode == UserManager.USER_EXISTS) {
-            User restoredUser = userRepo.findByCPF(user.getCPF());
+            User restoredUser = userRepo.findByCpf(user.getCpf());
             if (!restoredUser.getUserType().equals(User.UserType.PROFESSIONAL)) {
                 return getResponseEntityFrom(HttpStatus.FORBIDDEN, getErrorMessageByCode(UserManager.USER_NOT_ALLOWED));
             }
@@ -216,7 +225,7 @@ public class MainController {
         String response = "";
         response += "name:" + user.getName();
         response += " username:" + user.getUserName();
-        response += " cpf:" + user.getCPF();
+        response += " cpf:" + user.getCpf();
         response += " password:" + user.getPassword();
         response += " token:" + user.getToken();
         response += " type:" + user.getUserType();

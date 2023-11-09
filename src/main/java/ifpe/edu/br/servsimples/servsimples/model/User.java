@@ -28,8 +28,8 @@ public class User {
     private final List<Service> services = new ArrayList<>();
     @Column(nullable = false)
     private String name;
-    @Column(nullable = false, unique = true)
-    private String CPF;
+    @Column(name = "cpf", nullable = false, unique = true)
+    private String cpf;
     @Column(nullable = false)
     private String userName;
     @Column(nullable = false)
@@ -70,8 +70,8 @@ public class User {
         this.userType = userType;
     }
 
-    public void setCPF(String CPF) {
-        this.CPF = CPF;
+    public void setCpf(String CPF) {
+        this.cpf = CPF;
     }
 
     public void setId(Long id) {
