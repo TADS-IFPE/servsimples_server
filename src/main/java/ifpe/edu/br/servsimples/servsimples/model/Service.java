@@ -14,6 +14,8 @@ public class Service {
     private Cost cost;
     @Column(nullable = false)
     private String name;
+    private String category;
+    private String description;
 
     public Service() {
     }
@@ -28,5 +30,13 @@ public class Service {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

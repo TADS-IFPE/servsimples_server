@@ -1,7 +1,9 @@
 package ifpe.edu.br.servsimples.servsimples.managers;
 
+import ifpe.edu.br.servsimples.servsimples.InterfacesWrapper;
 import ifpe.edu.br.servsimples.servsimples.model.Cost;
 import ifpe.edu.br.servsimples.servsimples.model.Service;
+import org.springframework.http.ResponseEntity;
 
 import java.util.List;
 
@@ -24,6 +26,7 @@ public class ServiceManager {
         if (cost.getTime() == null || cost.getTime().isBlank() || cost.getTime().isEmpty()) return SERVICE_COST_ERROR;
         if (cost.getValue() == null || cost.getValue().isEmpty() || cost.getValue().isBlank())
             return SERVICE_VALUE_ERROR;
+        // TODO add category
         return SERVICE_VALID;
     }
 

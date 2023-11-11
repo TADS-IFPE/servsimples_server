@@ -7,6 +7,7 @@ import ifpe.edu.br.servsimples.servsimples.autentication.Token;
 import ifpe.edu.br.servsimples.servsimples.managers.AuthManager;
 import ifpe.edu.br.servsimples.servsimples.managers.ServiceManager;
 import ifpe.edu.br.servsimples.servsimples.managers.UserManager;
+import ifpe.edu.br.servsimples.servsimples.model.Service;
 import ifpe.edu.br.servsimples.servsimples.model.User;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +18,8 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 
 @CrossOrigin("*")
@@ -144,22 +147,29 @@ public class MainController {
 
     @PostMapping("api/register/service")
     public ResponseEntity<String> registerService(@RequestBody User user) {
-        ServSimplesApplication.logi(TAG, "registerService:");
-        int userValidationCode = mUserManager.getUserInfoValidationCode(user);
-        if (userValidationCode == UserManager.USER_EXISTS) {
-            User restoredUser = userRepo.findByCpf(user.getCpf());
-            if (!restoredUser.getUserType().equals(User.UserType.PROFESSIONAL)) {
-                return getResponseEntityFrom(HttpStatus.FORBIDDEN, getErrorMessageByCode(UserManager.USER_NOT_ALLOWED));
-            }
-            int serviceValidationCode = mServiceManager.getServiceValidationCode(user.getServices());
-            if (serviceValidationCode == ServiceManager.SERVICE_VALID) {
-                restoredUser.addService(user.getServices().get(0));
-                userRepo.save(restoredUser);
-                return getResponseEntityFrom(HttpStatus.OK, restoredUser);
-            }
-            return getResponseEntityFrom(HttpStatus.FORBIDDEN, getErrorMessageByCode(serviceValidationCode));
+        ServSimplesApplication.logi(TAG, "registerService:" + showUserInfo(user));
+        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
+        if (restoredUser == null) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
+                    getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
-        return getResponseEntityFrom(HttpStatus.FORBIDDEN, getErrorMessageByCode(userValidationCode));
+        if (restoredUser.getUserType() != User.UserType.PROFESSIONAL) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_ALLOWED,
+                    getErrorMessageByCode(UserManager.USER_NOT_ALLOWED));
+        }
+
+        int serviceValidationCode = mServiceManager.getServiceValidationCode(user.getServices());
+        if (serviceValidationCode != ServiceManager.SERVICE_VALID) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.SERVICE_INVALID,
+                    getErrorMessageByCode(serviceValidationCode));
+        }
+
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+        return mAuthManager.handleTokenValidation(() -> {
+            restoredUser.addService(user.getServices().get(0));
+            mUserManager.updateUser(restoredUser);
+            return user;
+        }, tokenValidationCode);
     }
 
     @PostMapping("api/unregister/service")

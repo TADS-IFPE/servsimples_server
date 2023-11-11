@@ -1,5 +1,6 @@
 package ifpe.edu.br.servsimples.servsimples;
 
+import ifpe.edu.br.servsimples.servsimples.model.Service;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -10,8 +11,12 @@ public abstract class InterfacesWrapper {
 
     public interface ITokenValidation{
         Object onSuccess();
-    }
 
+    }
+    public interface IServiceValidation {
+        void onSuccess(Service service);
+        void onFailure();
+    }
     public interface ServSimplesHTTPConstants {
         HttpStatus USER_EXISTS = HttpStatus.UNPROCESSABLE_ENTITY;
         HttpStatus USER_NOT_EXISTS = HttpStatus.REQUESTED_RANGE_NOT_SATISFIABLE;
@@ -24,5 +29,8 @@ public abstract class InterfacesWrapper {
         HttpStatus PASSWORD_INVALID = HttpStatus.PARTIAL_CONTENT;
         HttpStatus TOKEN_EXPIRED = HttpStatus.UPGRADE_REQUIRED;
         HttpStatus FAILURE = HttpStatus.IM_USED;
+        HttpStatus USER_NOT_ALLOWED = HttpStatus.UNAUTHORIZED;
+
+        HttpStatus SERVICE_INVALID = HttpStatus.TOO_EARLY;
     }
 }

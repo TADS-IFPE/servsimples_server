@@ -64,6 +64,15 @@ public class AuthManager extends Manager{
         }
     }
 
+    /**
+     * This method verifies if the token is valid, if so
+     * the method InterfacesWrapper.ITokenValidation#onSuccess() is called.
+     * However, the response is based on the token validation issue.
+     *
+     * @param func the routine that mus be executed in case of success token validation
+     * @param tokenValidationCode the code that indicates the token validation status
+     * @return an object with request information to be sent to user
+     */
     public ResponseEntity<String> handleTokenValidation(InterfacesWrapper.ITokenValidation func,
                                                         int tokenValidationCode) {
         ResponseEntity<String> response = null;
