@@ -7,7 +7,6 @@ import ifpe.edu.br.servsimples.servsimples.autentication.Token;
 import ifpe.edu.br.servsimples.servsimples.managers.AuthManager;
 import ifpe.edu.br.servsimples.servsimples.managers.ServiceManager;
 import ifpe.edu.br.servsimples.servsimples.managers.UserManager;
-import ifpe.edu.br.servsimples.servsimples.model.Service;
 import ifpe.edu.br.servsimples.servsimples.model.User;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +18,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 
@@ -65,7 +66,7 @@ public class MainController {
     }
 
     @PostMapping("api/login")
-    public ResponseEntity<String> login(@RequestBody User user ) {
+    public ResponseEntity<String> login(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "login:" + showUserInfo(user));
         int userValidationCode = mUserManager.getLoginInfoValidationCode(user);
         if (userValidationCode == UserManager.USER_VALID) {
@@ -143,6 +144,28 @@ public class MainController {
             responseUser.setName(user.getName());
             return responseUser;
         }, tokenValidationCode);
+    }
+
+    @PostMapping("api/get/service/categories")
+    public ResponseEntity<String> getCategories(@RequestBody User user) {
+        ServSimplesApplication.logi(TAG, "getCategories:" + showUserInfo(user));
+        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
+        if (restoredUser == null) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
+                    getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
+        }
+        if (restoredUser.getUserType() != User.UserType.PROFESSIONAL) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_ALLOWED,
+                    getErrorMessageByCode(UserManager.USER_NOT_ALLOWED));
+        }
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+        return mAuthManager.handleTokenValidation(this::getMockCategories, tokenValidationCode);
+    }
+
+    private List<String> getMockCategories() {
+        return new ArrayList<>(Arrays.asList(
+                "Saúde", "Educação", "Lazer"
+        ));
     }
 
     @PostMapping("api/register/service")
