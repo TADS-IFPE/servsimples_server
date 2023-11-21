@@ -7,6 +7,7 @@ import ifpe.edu.br.servsimples.servsimples.autentication.Token;
 import ifpe.edu.br.servsimples.servsimples.managers.AuthManager;
 import ifpe.edu.br.servsimples.servsimples.managers.ServiceManager;
 import ifpe.edu.br.servsimples.servsimples.managers.UserManager;
+import ifpe.edu.br.servsimples.servsimples.model.Service;
 import ifpe.edu.br.servsimples.servsimples.model.User;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +45,7 @@ public class MainController {
 
     @PostMapping("api/register/user")
     public ResponseEntity<String> registerUser(@RequestBody User user) {
-        ServSimplesApplication.logi(TAG, "registerUser: " + showUserInfo(user));
+        ServSimplesApplication.logi(TAG, "registerUser: " + getUserInfoString(user));
         int validationCode = mUserManager.getUserInfoValidationCode(user);
         if (validationCode == UserManager.USER_VALID) {
             User restoredUser = mUserManager.getUserByCPF(user.getCpf());
@@ -67,7 +68,7 @@ public class MainController {
 
     @PostMapping("api/login")
     public ResponseEntity<String> login(@RequestBody User user) {
-        ServSimplesApplication.logi(TAG, "login:" + showUserInfo(user));
+        ServSimplesApplication.logi(TAG, "login:" + getUserInfoString(user));
         int userValidationCode = mUserManager.getLoginInfoValidationCode(user);
         if (userValidationCode == UserManager.USER_VALID) {
             User restoredUser = mUserManager.getUserByUsername(user.getUserName());
@@ -94,7 +95,7 @@ public class MainController {
 
     @PostMapping("api/get/user")
     public ResponseEntity<String> getUSer(@RequestBody User user) {
-        ServSimplesApplication.logi(TAG, "getUSer:" + showUserInfo(user));
+        ServSimplesApplication.logi(TAG, "getUSer:" + getUserInfoString(user));
         User restoredUser = mUserManager.getUserByCPF(user.getCpf());
         if (restoredUser == null) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
@@ -121,7 +122,7 @@ public class MainController {
 
     @PostMapping("api/update/user")
     public ResponseEntity<String> updateUser(@RequestBody User user) {
-        ServSimplesApplication.logi(TAG, "updateUser: " + showUserInfo(user));
+        ServSimplesApplication.logi(TAG, "updateUser: " + getUserInfoString(user));
         User restoredUser = mUserManager.getUserByCPF(user.getCpf());
         if (restoredUser == null) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
@@ -148,7 +149,7 @@ public class MainController {
 
     @PostMapping("api/get/service/categories")
     public ResponseEntity<String> getCategories(@RequestBody User user) {
-        ServSimplesApplication.logi(TAG, "getCategories:" + showUserInfo(user));
+        ServSimplesApplication.logi(TAG, "getCategories:" + getUserInfoString(user));
         User restoredUser = mUserManager.getUserByCPF(user.getCpf());
         if (restoredUser == null) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
@@ -170,7 +171,8 @@ public class MainController {
 
     @PostMapping("api/register/service")
     public ResponseEntity<String> registerService(@RequestBody User user) {
-        ServSimplesApplication.logi(TAG, "registerService:" + showUserInfo(user));
+        ServSimplesApplication.logi(TAG, "registerService:" + getUserInfoString(user) +
+                " service info:" + getServiceInfoFromUserString(user));
         User restoredUser = mUserManager.getUserByCPF(user.getCpf());
         if (restoredUser == null) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
@@ -195,6 +197,34 @@ public class MainController {
         }, tokenValidationCode);
     }
 
+    @PostMapping("api/update/service")
+    public ResponseEntity<String> getServiceInfoString(@RequestBody User user) {
+        ServSimplesApplication.logi(TAG, "updateService:" + getUserInfoString(user) +
+                " service info:" + getServiceInfoFromUserString(user));
+        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
+        if (restoredUser == null) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
+                    getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
+        }
+        if (restoredUser.getUserType() != User.UserType.PROFESSIONAL) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_ALLOWED,
+                    getErrorMessageByCode(UserManager.USER_NOT_ALLOWED));
+        }
+
+        int serviceValidationCode = mServiceManager.getServiceValidationCode(user.getServices());
+        if (serviceValidationCode != ServiceManager.SERVICE_VALID) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.SERVICE_INVALID,
+                    getErrorMessageByCode(serviceValidationCode));
+        }
+
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+        return mAuthManager.handleTokenValidation(() -> {
+            Service editedService = user.getServices().get(0);
+            restoredUser.updateService(editedService);
+            mUserManager.updateUser(restoredUser);
+            return user;
+        }, tokenValidationCode);
+    }
     @PostMapping("api/unregister/service")
     public ResponseEntity<String> unregisterService(@RequestBody User user) {
 
@@ -251,7 +281,7 @@ public class MainController {
         };
     }
 
-    private String showUserInfo(User user) {
+    private String getUserInfoString(User user) {
         if (user == null) {
             return "user is null";
         }
@@ -262,6 +292,29 @@ public class MainController {
         response += " password:" + user.getPassword();
         response += " token:" + user.getToken();
         response += " type:" + user.getUserType();
+        return response;
+    }
+
+    private String getServiceInfoFromUserString(User user) {
+        if (user == null) {
+            return "user is null";
+        }
+        List<Service> services = user.getServices();
+        if (services.isEmpty()) {
+            return "no service found";
+        }
+        Service service = services.get(0);
+        if (service == null) {
+            return "service is null";
+        }
+        String response = "";
+        response += "id:" + service.getId();
+        response += " name:" + service.getName();
+        response += " description:" + service.getDescription();
+        response += " category:" + service.getCategory();
+        response += " cost value:" + service.getCost().getValue();
+        response += " cost time:" + service.getCost().getTime();
+
         return response;
     }
 }

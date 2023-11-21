@@ -19,6 +19,7 @@ public class AuthManager extends Manager{
     private static final String TAG = AuthManager.class.getSimpleName();
 
     private static final long ONE_DAY = 1000L * 60L * 60L * 24L;
+    private static final long ONE_HOUR = 1000L * 60L * 60;
 
     public static final int TOKEN_INVALID = 200;
     public static final int TOKEN_VALID = 201;
@@ -154,7 +155,7 @@ public class AuthManager extends Manager{
         Long timeStampLong = Long.valueOf(timestamp);
         Long now = new Date().getTime();
         long delta = now - timeStampLong;
-        if (delta > (ONE_DAY)) return TOKEN_EXPIRED;
+        if (delta > (ONE_HOUR)) return TOKEN_EXPIRED;
         return TOKEN_VALID;
     }
 
@@ -199,7 +200,7 @@ public class AuthManager extends Manager{
         Long timeStampLong = Long.valueOf(timestamp);
         Long now = new Date().getTime();
         long delta = now - timeStampLong;
-        if (delta > (ONE_DAY)) return TOKEN_EXPIRED;
+        if (delta > (ONE_HOUR)) return TOKEN_EXPIRED;
         return TOKEN_VALID;
     }
 
@@ -232,7 +233,7 @@ public class AuthManager extends Manager{
         Long timeStampLong = Long.valueOf(getTimestampFromDecryptedToken(decryptedToken));
         Long now = new Date().getTime();
         long delta = now - timeStampLong;
-        if (delta > (ONE_DAY)) return TOKEN_EXPIRED;
+        if (delta > (ONE_HOUR)) return TOKEN_EXPIRED;
 
         return TOKEN_VALID;
     }

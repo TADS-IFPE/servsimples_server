@@ -5,6 +5,7 @@ import lombok.Getter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Getter
 @Entity
@@ -88,5 +89,16 @@ public class User {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public void updateService(Service editedService) {
+        for (Service s: services) {
+            if (Objects.equals(s.getId(), editedService.getId())) {
+                s.setCost(editedService.getCost());
+                s.setName(editedService.getName());
+                s.setCategory(editedService.getCategory());
+                s.setDescription(editedService.getDescription());
+            }
+        }
     }
 }
