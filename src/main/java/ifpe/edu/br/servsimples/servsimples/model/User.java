@@ -1,5 +1,6 @@
 package ifpe.edu.br.servsimples.servsimples.model;
 
+import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
 import jakarta.persistence.*;
 import lombok.Getter;
 
@@ -21,10 +22,10 @@ public class User {
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "user_wallet_id", referencedColumnName = "wallet_id", nullable = false)
     private final Wallet wallet = new Wallet();
-    @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval=true)
     @JoinColumn(name = "user_notifications_id", nullable = false)
     private final List<Notification> notifications = new ArrayList<>();
-    @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval=true)
     @JoinColumn(name = "user_services_id", nullable = false)
     private final List<Service> services = new ArrayList<>();
     @Column(nullable = false)
@@ -42,9 +43,8 @@ public class User {
     private String token;
 
     public enum UserType {
-        USER, PROFESSIONAL, ADMIN
+        USER, PROFESSIONAL, ADMIN;
     }
-
     /** This method *MUST* be called when getting token
      * instead a #getToken() method
      *
@@ -100,5 +100,9 @@ public class User {
                 s.setDescription(editedService.getDescription());
             }
         }
+    }
+
+    public void unregisterService(Service serviceToRemove) {
+        services.removeIf(s -> Objects.equals(s.getId(), serviceToRemove.getId()));
     }
 }

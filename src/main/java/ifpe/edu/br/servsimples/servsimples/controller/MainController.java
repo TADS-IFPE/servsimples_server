@@ -201,7 +201,9 @@ public class MainController {
     public ResponseEntity<String> getServiceInfoString(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "updateService:" + getUserInfoString(user) +
                 " service info:" + getServiceInfoFromUserString(user));
+
         User restoredUser = mUserManager.getUserByCPF(user.getCpf());
+
         if (restoredUser == null) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
@@ -218,6 +220,7 @@ public class MainController {
         }
 
         int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+
         return mAuthManager.handleTokenValidation(() -> {
             Service editedService = user.getServices().get(0);
             restoredUser.updateService(editedService);
@@ -225,10 +228,37 @@ public class MainController {
             return user;
         }, tokenValidationCode);
     }
+
     @PostMapping("api/unregister/service")
     public ResponseEntity<String> unregisterService(@RequestBody User user) {
+        ServSimplesApplication.logi(TAG, "unregisterService:" + getUserInfoString(user) +
+                " service info:" + getServiceInfoFromUserString(user));
 
-        return getResponseEntityFrom(HttpStatus.FORBIDDEN, getErrorMessageByCode(10));
+        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
+
+        if (restoredUser == null) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
+                    getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
+        }
+        if (restoredUser.getUserType() != User.UserType.PROFESSIONAL) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_ALLOWED,
+                    getErrorMessageByCode(UserManager.USER_NOT_ALLOWED));
+        }
+
+        int serviceValidationCode = mServiceManager.getServiceValidationCode(user.getServices());
+        if (serviceValidationCode != ServiceManager.SERVICE_VALID) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.SERVICE_INVALID,
+                    getErrorMessageByCode(serviceValidationCode));
+        }
+
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+
+        return mAuthManager.handleTokenValidation(() -> {
+            Service serviceToRemove = user.getServices().get(0);
+            restoredUser.unregisterService(serviceToRemove);
+            mUserManager.updateUser(restoredUser);
+            return user;
+        }, tokenValidationCode);
     }
 
     private ResponseEntity<String> getResponseEntityFrom(HttpStatus status, Object object) {
