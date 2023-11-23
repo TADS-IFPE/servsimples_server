@@ -30,6 +30,7 @@ public class User {
     private final List<Service> services = new ArrayList<>();
     @Column(nullable = false)
     private String name;
+    private String bio;
     @Column(name = "cpf", nullable = false, unique = true)
     private String cpf;
     @Column(nullable = false)
@@ -77,6 +78,11 @@ public class User {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+
+    public void setBio(String bio) {
+        this.bio = bio;
     }
 
     public void setName(String name) {

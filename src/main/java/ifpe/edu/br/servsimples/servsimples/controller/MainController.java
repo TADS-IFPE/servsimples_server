@@ -131,6 +131,7 @@ public class MainController {
         int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
         return mAuthManager.handleTokenValidation(() -> {
             restoredUser.setUserName(user.getUserName());
+            restoredUser.setBio(user.getBio());
             restoredUser.setPassword(user.getPassword());
             restoredUser.setUserType(user.getUserType());
             restoredUser.setName(user.getName());
@@ -143,6 +144,7 @@ public class MainController {
             responseUser.setUserName(user.getUserName());
             responseUser.setCpf(user.getCpf());
             responseUser.setName(user.getName());
+            responseUser.setBio(user.getBio());
             return responseUser;
         }, tokenValidationCode);
     }
