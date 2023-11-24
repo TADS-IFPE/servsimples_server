@@ -1,5 +1,6 @@
 package ifpe.edu.br.servsimples.servsimples.managers;
 
+import ifpe.edu.br.servsimples.servsimples.model.Service;
 import ifpe.edu.br.servsimples.servsimples.model.User;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
 
@@ -42,7 +43,7 @@ public class UserManager {
             return ERROR_NAME;
         }
         if (user.getPassword().equals(user.getUserName()) || user.getCpf().equals(user.getUserName()) ||
-        user.getCpf().equals(user.getPassword())) {
+                user.getCpf().equals(user.getPassword())) {
             return USER_INFO_DUPLICATED;
         }
         return USER_VALID;
@@ -57,16 +58,7 @@ public class UserManager {
             return MISSING_LOGIN_INFO;
         }
 
-//        if (userName.length() != 64 || password.length() != 64) {
-//            return LOGIN_INFO_LENGTH_ERROR;
-//        }
-
         return USER_VALID;
-    }
-
-    public boolean userExists(User user) {
-
-        return false;
     }
 
     public User getUserByCPF(String cpf) {
@@ -87,5 +79,9 @@ public class UserManager {
 
     public User getUserByUsername(String userName) {
         return userRepo.findByUserName(userName);
+    }
+
+    public User getUserByService(Service service) {
+        return userRepo.findUsersByServicesContaining(service);
     }
 }

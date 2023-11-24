@@ -2,6 +2,7 @@ package ifpe.edu.br.servsimples.servsimples;
 
 import ifpe.edu.br.servsimples.servsimples.controller.MainController;
 import ifpe.edu.br.servsimples.servsimples.model.*;
+import ifpe.edu.br.servsimples.servsimples.repo.ServiceRepo;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -38,9 +39,9 @@ class UserControllerTest {
     private final MainController userController;
 
     @Autowired
-    public UserControllerTest(UserRepo userRepo) {
+    public UserControllerTest(UserRepo userRepo, ServiceRepo serviceRepo) {
         this.userRepo = userRepo;
-        userController = new MainController(userRepo);
+        userController = new MainController(userRepo, serviceRepo);
     }
 
     @Test

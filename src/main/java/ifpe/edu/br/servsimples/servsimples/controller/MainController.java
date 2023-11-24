@@ -9,6 +9,7 @@ import ifpe.edu.br.servsimples.servsimples.managers.ServiceManager;
 import ifpe.edu.br.servsimples.servsimples.managers.UserManager;
 import ifpe.edu.br.servsimples.servsimples.model.Service;
 import ifpe.edu.br.servsimples.servsimples.model.User;
+import ifpe.edu.br.servsimples.servsimples.repo.ServiceRepo;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -36,10 +37,10 @@ public class MainController {
     private final AuthManager mAuthManager;
 
     @Autowired
-    public MainController(UserRepo userController) {
+    public MainController(UserRepo userController, ServiceRepo serviceRepo) {
         this.userRepo = userController;
         mUserManager = new UserManager(userRepo);
-        mServiceManager = new ServiceManager();
+        mServiceManager = new ServiceManager(serviceRepo);
         mAuthManager = AuthManager.getInstance();
     }
 
@@ -165,12 +166,6 @@ public class MainController {
         return mAuthManager.handleTokenValidation(this::getMockCategories, tokenValidationCode);
     }
 
-    private List<String> getMockCategories() {
-        return new ArrayList<>(Arrays.asList(
-                "Saúde", "Educação", "Lazer"
-        ));
-    }
-
     @PostMapping("api/register/service")
     public ResponseEntity<String> registerService(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "registerService:" + getUserInfoString(user) +
@@ -261,6 +256,46 @@ public class MainController {
             mUserManager.updateUser(restoredUser);
             return user;
         }, tokenValidationCode);
+    }
+
+    @PostMapping("api/get/service/by/category")
+    public ResponseEntity<String> getAllServicesByCategory(@RequestBody User user) {
+        ServSimplesApplication.logi(TAG, "getAllServicesByCategory:" + getUserInfoString(user));
+
+        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
+
+        if (restoredUser == null) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
+                    getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
+        }
+
+        return mAuthManager.handleTokenValidation(() ->
+                        mServiceManager
+                                .getAllServicesByCategory(user.getServices()
+                                        .get(0)
+                                        .getCategory()),
+                mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString()));
+    }
+
+    @PostMapping("api/get/user/by/service")
+    public ResponseEntity<String> getUserFromService(@RequestBody User user) {
+        ServSimplesApplication.logi(TAG, "getUserFromService:" + getUserInfoString(user));
+
+        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
+
+        if (restoredUser == null) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
+                    getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
+        }
+        return mAuthManager.handleTokenValidation(
+                () -> null,
+                mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString()));
+    }
+
+    private List<String> getMockCategories() {
+        return new ArrayList<>(Arrays.asList(
+                "Saúde", "Educação", "Lazer"
+        ));
     }
 
     private ResponseEntity<String> getResponseEntityFrom(HttpStatus status, Object object) {

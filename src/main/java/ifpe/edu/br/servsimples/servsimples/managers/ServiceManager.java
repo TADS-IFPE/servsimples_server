@@ -1,8 +1,10 @@
 package ifpe.edu.br.servsimples.servsimples.managers;
 
 import ifpe.edu.br.servsimples.servsimples.InterfacesWrapper;
+import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
 import ifpe.edu.br.servsimples.servsimples.model.Cost;
 import ifpe.edu.br.servsimples.servsimples.model.Service;
+import ifpe.edu.br.servsimples.servsimples.repo.ServiceRepo;
 import org.springframework.http.ResponseEntity;
 
 import java.util.List;
@@ -17,6 +19,13 @@ public class ServiceManager {
     public static final int SERVICE_IS_EMPTY = 106;
     public static final int SERVICE_DUPLICATE = 107;
 
+    private final ServiceRepo mServiceRepo;
+    private String TAG = ServiceManager.class.getSimpleName();
+
+    public ServiceManager(ServiceRepo serviceRepo) {
+        this.mServiceRepo = serviceRepo;
+    }
+
     public int getServiceValidationCode(Service service) {
         if (service == null) return SERVICE_IS_NULL;
         String name = service.getName();
@@ -26,7 +35,6 @@ public class ServiceManager {
         if (cost.getTime() == null || cost.getTime().isBlank() || cost.getTime().isEmpty()) return SERVICE_COST_ERROR;
         if (cost.getValue() == null || cost.getValue().isEmpty() || cost.getValue().isBlank())
             return SERVICE_VALUE_ERROR;
-        // TODO add category
         return SERVICE_VALID;
     }
 
@@ -34,5 +42,15 @@ public class ServiceManager {
         if (services.isEmpty()) return SERVICE_IS_EMPTY;
         if (services.size() > 1) return SERVICE_DUPLICATE;
         return getServiceValidationCode(services.get(0));
+    }
+
+    public List<Service> getAllServicesByCategory(String category) {
+        List<Service> services = null;
+        try {
+            services = mServiceRepo.findAllByCategory(category);
+        } catch (Exception e) {
+            ServSimplesApplication.logi(TAG, "Erro ao recuperar serviços");
+        }
+        return services;
     }
 }
