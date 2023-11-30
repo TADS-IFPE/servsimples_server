@@ -279,7 +279,8 @@ public class MainController {
 
     @PostMapping("api/get/user/by/service")
     public ResponseEntity<String> getUserFromService(@RequestBody User user) {
-        ServSimplesApplication.logi(TAG, "getUserFromService:" + getUserInfoString(user));
+        ServSimplesApplication.logi(TAG, "getUserFromService:" + getUserInfoString(user)
+                + " service info:" + getServiceInfoFromUserString(user));
 
         User restoredUser = mUserManager.getUserByCPF(user.getCpf());
 
@@ -288,7 +289,13 @@ public class MainController {
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
         return mAuthManager.handleTokenValidation(
-                () -> null,
+                () -> {
+                    User userByService = mUserManager.getUserByService(user.getServices().get(0));
+                    User responseUser = new User();
+                    responseUser.setBio(userByService.getBio());
+                    responseUser.setName(userByService.getName());
+                    return responseUser;
+                },
                 mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString()));
     }
 
