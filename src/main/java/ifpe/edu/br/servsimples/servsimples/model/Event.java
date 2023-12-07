@@ -1,3 +1,8 @@
+/*
+ * Dispositivos Móveis - IFPE 2023
+ * Author: Willian Santos
+ * Project: ServSimplesApp
+ */
 package ifpe.edu.br.servsimples.servsimples.model;
 
 import ifpe.edu.br.servsimples.servsimples.repo.Subscriber;
@@ -21,7 +26,7 @@ public class Event implements Subscriber {
     @Column(name = "event_id")
     private Long id;
     private int type;
-    private String description;
+    private String description; // TODO remove
     private Long start;
     private Long end;
     @Column(name = "subscribers")

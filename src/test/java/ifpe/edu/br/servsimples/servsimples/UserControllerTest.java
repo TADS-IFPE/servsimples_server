@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Random;
 
@@ -122,11 +123,17 @@ class UserControllerTest {
         event.setStart(50L);
         event.setDescription("MEU VENTINHO");
         event.setType(Event.TYPE_PUBLISH);
-        agenda.setEvent(event);
         userRepo.save(restoredUser);
 
         User restoredUser3 = userRepo.findByCpf(USER_MOCK_CPF);
         userRepo.delete(restoredUser3);
+    }
+
+    @Test
+    public void testeee(){
+        LocalTime now = LocalTime.now();
+        //logger.debug(now.toString());
+        assert true;
     }
 
     private Event getMockedPublishEventFromService(Service mockedService) {

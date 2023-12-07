@@ -1,3 +1,8 @@
+/*
+ * Dispositivos Móveis - IFPE 2023
+ * Author: Willian Santos
+ * Project: ServSimplesApp
+ */
 package ifpe.edu.br.servsimples.servsimples.model;
 
 import jakarta.persistence.Embeddable;

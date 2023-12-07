@@ -1,3 +1,8 @@
+/*
+ * Dispositivos Móveis - IFPE 2023
+ * Author: Willian Santos
+ * Project: ServSimplesApp
+ */
 package ifpe.edu.br.servsimples.servsimples.controller;
 
 import com.google.gson.Gson;
@@ -5,23 +10,26 @@ import ifpe.edu.br.servsimples.servsimples.InterfacesWrapper;
 import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
 import ifpe.edu.br.servsimples.servsimples.autentication.Token;
 import ifpe.edu.br.servsimples.servsimples.managers.AuthManager;
+import ifpe.edu.br.servsimples.servsimples.managers.AvailabilityManager;
 import ifpe.edu.br.servsimples.servsimples.managers.ServiceManager;
 import ifpe.edu.br.servsimples.servsimples.managers.UserManager;
+import ifpe.edu.br.servsimples.servsimples.model.Appointment;
+import ifpe.edu.br.servsimples.servsimples.model.Availability;
 import ifpe.edu.br.servsimples.servsimples.model.Service;
 import ifpe.edu.br.servsimples.servsimples.model.User;
 import ifpe.edu.br.servsimples.servsimples.repo.ServiceRepo;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
+import ifpe.edu.br.servsimples.servsimples.utils.AppointmentWrapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 
 
@@ -35,6 +43,7 @@ public class MainController {
     private final UserManager mUserManager;
     private final ServiceManager mServiceManager;
     private final AuthManager mAuthManager;
+    private final AvailabilityManager mAvailabilityManager;
 
     @Autowired
     public MainController(UserRepo userController, ServiceRepo serviceRepo) {
@@ -42,6 +51,81 @@ public class MainController {
         mUserManager = new UserManager(userRepo);
         mServiceManager = new ServiceManager(serviceRepo);
         mAuthManager = AuthManager.getInstance();
+        mAvailabilityManager = new AvailabilityManager();
+    }
+
+    @GetMapping("api/test")
+    public void lala() {
+        Date date = new Date();
+        long time = date.getTime();
+        ServSimplesApplication.logi(TAG, "now: " + convertToHumanReadable(time));
+    }
+
+    @PostMapping("api/register/user/availability")
+    public ResponseEntity<String> registerAvailability(@RequestBody User user) {
+        ServSimplesApplication.logi(TAG, "registerAvailability: " + getUserInfoString(user) +
+                "availability info:" + getAvailabilityInfoToString(user.getAgenda().getAvailabilities().get(0)));
+
+        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
+
+        if (restoredUser == null) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
+                    getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
+        }
+
+        if (restoredUser.getUserType() != User.UserType.PROFESSIONAL) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_ALLOWED,
+                    getErrorMessageByCode(UserManager.USER_NOT_ALLOWED));
+        }
+
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+        return mAuthManager.handleTokenValidation(() -> {
+            Availability newAvailability = user.getAgenda().getAvailabilities().get(0);
+            int availabilityValidationCode =
+                    mAvailabilityManager.getNewAvailabilityValidationCode(restoredUser.getAgenda(), newAvailability);
+            if (availabilityValidationCode == AvailabilityManager.AVAILABILITY_VALID) {
+                restoredUser.getAgenda().addAvailability(newAvailability);
+                mUserManager.updateUser(restoredUser);
+            }
+            return availabilityValidationCode;
+        }, tokenValidationCode);
+    }
+
+    @PostMapping("api/register/user/appointment")
+    public ResponseEntity<String> registerAppointment(@RequestBody AppointmentWrapper appointmentWrapper) {
+        ServSimplesApplication.logi(TAG, "[registerAppointment] user info:" + getUserInfoString(appointmentWrapper.getClient())
+                + " Appointment info:" + getAppointmentInfoString(appointmentWrapper.getClient().getAgenda().getAvailabilities().get(0).getAppointment()));
+
+        User restoredClientUser = mUserManager.getUserByCPF(appointmentWrapper.getClient().getCpf());
+        User restoredProfessionalUser = mUserManager.getUserByCPF(appointmentWrapper.getProfessional().getCpf());
+
+        if (restoredClientUser == null || restoredProfessionalUser == null) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
+                    getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
+        }
+
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredClientUser,
+                appointmentWrapper.getClient().getTokenString());
+
+        return mAuthManager.handleTokenValidation(() -> {
+            if (mAvailabilityManager.isAppointmentValid(appointmentWrapper)) {
+                ServSimplesApplication.logi(TAG, "Appointment is valid");
+                AppointmentWrapper restoredUsersWrapper = new AppointmentWrapper();
+                restoredUsersWrapper.setProfessional(restoredProfessionalUser);
+                restoredUsersWrapper.setClient(restoredClientUser);
+                AppointmentWrapper result
+                        = mAvailabilityManager.performAppointmentRegistration(appointmentWrapper, restoredUsersWrapper);
+                if (result != null) {
+                    mUserManager.updateUser(result.getProfessional());
+                    mUserManager.updateUser(result.getClient());
+                    return true;
+                }
+                ServSimplesApplication.logi(TAG, "result wrapper is null");
+                return false;
+            }
+            ServSimplesApplication.logi(TAG, "Appointment is not valid");
+            return false;
+        }, tokenValidationCode);
     }
 
     @PostMapping("api/register/user")
@@ -390,5 +474,25 @@ public class MainController {
         response += " cost time:" + service.getCost().getTime();
 
         return response;
+    }
+
+    private String getAvailabilityInfoToString(Availability availability) {
+        if (availability == null) return " availability is null";
+        return " Availability: [start time:" + availability.getStartTime() + " end time:" + availability.getEndTime() +
+                " state:" + availability.getState() + " " + getAppointmentInfoString(availability.getAppointment()) +
+                "]";
+    }
+
+    public static String convertToHumanReadable(long epochMillis) {
+        Date date = new Date(epochMillis);
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yy HH:mm");
+        return sdf.format(date);
+    }
+
+    private String getAppointmentInfoString(Appointment appointment) {
+        if (appointment == null) return " Appointment is null";
+        return " Appointment: [start time:" + appointment.getStartTime() + " end time:" + appointment.getEndTime() +
+                " subscriber id:" + appointment.getSubscriberId() + "]";
+
     }
 }

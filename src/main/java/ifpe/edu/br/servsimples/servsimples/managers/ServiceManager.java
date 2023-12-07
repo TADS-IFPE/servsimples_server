@@ -1,11 +1,14 @@
+/*
+ * Dispositivos Móveis - IFPE 2023
+ * Author: Willian Santos
+ * Project: ServSimplesApp
+ */
 package ifpe.edu.br.servsimples.servsimples.managers;
 
-import ifpe.edu.br.servsimples.servsimples.InterfacesWrapper;
 import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
 import ifpe.edu.br.servsimples.servsimples.model.Cost;
 import ifpe.edu.br.servsimples.servsimples.model.Service;
 import ifpe.edu.br.servsimples.servsimples.repo.ServiceRepo;
-import org.springframework.http.ResponseEntity;
 
 import java.util.List;
 

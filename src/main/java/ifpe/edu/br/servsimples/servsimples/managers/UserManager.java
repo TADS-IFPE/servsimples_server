@@ -1,5 +1,11 @@
+/*
+ * Dispositivos Móveis - IFPE 2023
+ * Author: Willian Santos
+ * Project: ServSimplesApp
+ */
 package ifpe.edu.br.servsimples.servsimples.managers;
 
+import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
 import ifpe.edu.br.servsimples.servsimples.model.Service;
 import ifpe.edu.br.servsimples.servsimples.model.User;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
@@ -23,6 +29,7 @@ public class UserManager {
 
 
     private final UserRepo userRepo;
+    private String TAG = UserManager.class.getSimpleName();
 
     public UserManager(UserRepo userRepo) {
         this.userRepo = userRepo;
@@ -54,7 +61,8 @@ public class UserManager {
         String userName = user.getUserName();
         String password = user.getPassword();
 
-        if (userName.isEmpty() || userName.isBlank() || password.isEmpty() || password.isBlank()) {
+        if (userName == null || userName.isEmpty() || userName.isBlank() ||
+                password == null || password.isEmpty() || password.isBlank()) {
             return MISSING_LOGIN_INFO;
         }
 
@@ -74,7 +82,12 @@ public class UserManager {
     }
 
     public void save(User user) {
-        userRepo.save(user);
+        try {
+            userRepo.save(user);
+        } catch (Exception e) {
+            ServSimplesApplication.logi(TAG, "save user fail: "
+                    + e.getMessage());
+        }
     }
 
     public User getUserByUsername(String userName) {
