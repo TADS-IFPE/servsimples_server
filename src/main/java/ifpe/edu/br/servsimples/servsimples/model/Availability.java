@@ -44,4 +44,8 @@ public class Availability {
     @JoinColumn(name = "availability_appointment", referencedColumnName = "appointment_id")
     private Appointment appointment;
 
+    @ManyToOne
+    @JoinColumn(name = "agenda_id")
+    private Agenda agenda;
+
 }

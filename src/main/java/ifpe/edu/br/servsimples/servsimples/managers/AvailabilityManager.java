@@ -4,8 +4,8 @@ import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
 import ifpe.edu.br.servsimples.servsimples.model.Agenda;
 import ifpe.edu.br.servsimples.servsimples.model.Appointment;
 import ifpe.edu.br.servsimples.servsimples.model.Availability;
-import ifpe.edu.br.servsimples.servsimples.model.User;
 import ifpe.edu.br.servsimples.servsimples.utils.AppointmentWrapper;
+import lombok.NonNull;
 
 import java.util.List;
 
@@ -20,14 +20,13 @@ public class AvailabilityManager {
     /**
      * Esse método verifica se é possível adicionar uma
      * nova disponibilidade na agenda
+     * <p>
+     * Regras:
+     * Fim do período não pode ser menor ou igual ao início
+     * Não pode haver outra disponibilidade no mesmo intervalo
      *
-     *  Regras:
-     *      Fim do período não pode ser menor ou igual ao início
-     *      Não pode haver outra disponibilidade no mesmo intervalo
-     *
-     * @param agenda a qual deseja-se adicionar a disponibilidade
+     * @param agenda          a qual deseja-se adicionar a disponibilidade
      * @param newAvailability que deseja-se adicionar
-     *
      * @return um código de validação
      */
     public int getNewAvailabilityValidationCode(Agenda agenda,
@@ -50,10 +49,11 @@ public class AvailabilityManager {
     }
 
 
-    public boolean isAppointmentValid(AppointmentWrapper appointmentWrapper) {
+    public boolean isAppointmentWrapperValid(AppointmentWrapper appointmentWrapper) {
         try {
             Availability availability = appointmentWrapper.getProfessional().getAgenda().getAvailabilities().get(0);
             Appointment appointment = appointmentWrapper.getClient().getAgenda().getAvailabilities().get(0).getAppointment();
+            if (!(availability.getState() == Availability.AVAILABLE)) return false;
             return !hasConflict(
                     appointment.getStartTime(),
                     appointment.getEndTime(),
@@ -67,60 +67,9 @@ public class AvailabilityManager {
 
     private boolean hasConflict(long appointmentStart, long appointmentEnd,
                                 long availabilityStart, long availabilityEnd) {
-//        return !(appointmentEnd <= availabilityStart ||
-//                appointmentStart >= availabilityEnd); // TODO testar comportamento
         return !(appointmentStart >= availabilityStart &&
                 appointmentEnd <= availabilityEnd &&
                 appointmentStart < appointmentEnd);
-    }
-
-    public AppointmentWrapper performAppointmentRegistration(AppointmentWrapper appointmentTransactionWrapper,
-                                                             AppointmentWrapper restoredUsersWrapper) {
-        User restoredProfessional = restoredUsersWrapper.getProfessional();
-        User restoredClient = restoredUsersWrapper.getClient();
-
-        Availability transactionAvailability = appointmentTransactionWrapper.getProfessional().getAgenda().getAvailabilities().get(0);
-        Appointment transactionAppointment = appointmentTransactionWrapper.getClient().getAgenda().getAvailabilities().get(0).getAppointment();
-
-        if (restoredClient == null || restoredProfessional == null ||
-                transactionAppointment == null || transactionAvailability == null) return null;
-
-        AppointmentWrapper resultAppointmentWrapper = new AppointmentWrapper();
-
-        List<Availability> restoredProfessionalAvailabilities = restoredProfessional.getAgenda().getAvailabilities();
-        if (restoredProfessionalAvailabilities.isEmpty()) {
-            ServSimplesApplication.logi(TAG, "Professional user has no availability");
-            return null;
-        }
-        for (Availability iterationAvailability : restoredProfessionalAvailabilities) {
-            if (hasAvailabilityMatch(iterationAvailability, transactionAvailability)) {
-                ServSimplesApplication.logi(TAG, "found professional availability");
-                if (hasConflict(transactionAppointment.getStartTime(), transactionAppointment.getEndTime(),
-                        iterationAvailability.getStartTime(), iterationAvailability.getEndTime())) return null;
-                ServSimplesApplication.logi(TAG, "no conflict found");
-
-                long originalAvailabilityStart = iterationAvailability.getStartTime();
-                long originalAvailabilityEnd = iterationAvailability.getEndTime();
-
-                if (isAppointmentTimeEqualAvailability(transactionAppointment, originalAvailabilityStart, originalAvailabilityEnd)) {
-                    ServSimplesApplication.logi(TAG, "appointment time slot equals availability time slot");
-                    transactionAppointment.setSubscriberId(restoredClient.getId()); // add client as subscriber
-                    iterationAvailability.setAppointment(transactionAppointment);
-                    iterationAvailability.setState(Availability.ON_HOLD);
-                    resultAppointmentWrapper.setProfessional(restoredProfessional);
-                    restoredClient.getAgenda().getAvailabilities().add(iterationAvailability);
-                    resultAppointmentWrapper.setClient(restoredClient);
-                    return resultAppointmentWrapper;
-                } else {
-                    ServSimplesApplication.logi(TAG, "appointment time slot not equals availability time slot");
-
-                }
-            }
-            ServSimplesApplication.logi(TAG, "availability not match");
-            return null;
-        }
-        ServSimplesApplication.logi(TAG, "no availability found");
-        return null;
     }
 
     private boolean hasAvailabilityMatch(Availability iterationAvailability, Availability transactionAvailability) {
@@ -128,10 +77,82 @@ public class AvailabilityManager {
                 iterationAvailability.getEndTime() == transactionAvailability.getEndTime();
     }
 
-    private boolean isAppointmentTimeEqualAvailability(Appointment transactionAppointment,
-                                                       long originalAvailabilityStart,
-                                                       long originalAvailabilityEnd) {
-        return transactionAppointment.getStartTime() == originalAvailabilityStart &&
-                transactionAppointment.getEndTime() == originalAvailabilityEnd;
+    private boolean isAppointmentEqualWithAvailabilityTimeSlot(UserManager tranClientMgr,
+                                                               UserManager tranProfessionalMgr) {
+        Appointment appointment = tranClientMgr.appointment();
+        Availability availability = tranProfessionalMgr.availability();
+        if (appointment == null || availability == null) return false;
+        return appointment.getStartTime() == availability.getStartTime() &&
+                appointment.getEndTime() == availability.getEndTime();
+    }
+
+    public AppointmentWrapper performAppointmentRegistration(@NonNull UserManager tranClientMgr,
+                                                             @NonNull UserManager tranProfessionalMgr,
+                                                             @NonNull UserManager rstClientMgr,
+                                                             @NonNull UserManager rstProfessionalMgr) {
+        if (tranClientMgr.isNull() || tranProfessionalMgr.isNull() || rstClientMgr.isNull() || rstProfessionalMgr.isNull())
+            return null;
+
+        List<Availability> restProfAvailabilities = rstProfessionalMgr.availabilities();
+        if (restProfAvailabilities == null || restProfAvailabilities.isEmpty()) {
+            ServSimplesApplication.logi(TAG, "Professional user has no availability");
+            return null;
+        }
+        for (Availability profAvailIteration : restProfAvailabilities) {
+            if (hasAvailabilityMatch(profAvailIteration, tranProfessionalMgr.availability())) {
+                ServSimplesApplication.logi(TAG, "found professional availability");
+                if (profAvailIteration.getState() != Availability.AVAILABLE) return null;
+                if (hasAvailabilityConflict(tranProfessionalMgr, tranClientMgr)) return null;
+                ServSimplesApplication.logi(TAG, "no conflict found");
+
+                Appointment appointment = tranClientMgr.appointment();
+                if (appointment == null) return null;
+
+                Appointment newAppointment = new Appointment();
+                newAppointment.setStartTime(appointment.getStartTime());
+                newAppointment.setEndTime(appointment.getEndTime());
+                newAppointment.setSubscriberId(rstClientMgr.id());
+
+                if (isAppointmentEqualWithAvailabilityTimeSlot(tranClientMgr, tranProfessionalMgr)) {
+                    ServSimplesApplication.logi(TAG, "appointment time slot equals availability time slot");
+
+                    profAvailIteration.setAppointment(newAppointment);
+                    profAvailIteration.setState(Availability.ON_HOLD);
+
+                    Appointment clientAppointment = new Appointment();
+                    clientAppointment.setSubscriberId(rstProfessionalMgr.id());
+                    clientAppointment.setStartTime(profAvailIteration.getStartTime());
+                    clientAppointment.setEndTime(profAvailIteration.getEndTime());
+
+                    Availability availability = new Availability();
+                    availability.setStartTime(profAvailIteration.getStartTime());
+                    availability.setEndTime(profAvailIteration.getEndTime());
+                    availability.setAppointment(clientAppointment);
+                    availability.setState(Availability.ON_HOLD);
+
+                    rstClientMgr.availability(availability);
+
+                    AppointmentWrapper appointmentWrapper = new AppointmentWrapper();
+
+                    appointmentWrapper.setClient(rstClientMgr.user());
+                    appointmentWrapper.setProfessional(rstProfessionalMgr.user());
+                    return appointmentWrapper;
+                } else {
+                    ServSimplesApplication.logi(TAG, "appointment time slot not equals availability time slot");
+                    // TODO fazer essa parte aqui hahaha
+                }
+            }
+        }
+        ServSimplesApplication.logi(TAG, "availability not match");
+        return null;
+    }
+
+    private boolean hasAvailabilityConflict(UserManager tranProfessionalMgr, UserManager tranClientMgr) {
+        Appointment appointment = tranClientMgr.appointment();
+        Availability availability = tranProfessionalMgr.availability();
+        if (appointment == null || availability == null) return false;
+        return !(appointment.getStartTime() >= availability.getStartTime() &&
+                appointment.getEndTime() <= availability.getEndTime() &&
+                appointment.getStartTime() < appointment.getEndTime());
     }
 }

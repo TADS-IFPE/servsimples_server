@@ -6,9 +6,11 @@
 package ifpe.edu.br.servsimples.servsimples.managers;
 
 import ifpe.edu.br.servsimples.servsimples.autentication.Token;
-import ifpe.edu.br.servsimples.servsimples.model.Service;
-import ifpe.edu.br.servsimples.servsimples.model.User;
+import ifpe.edu.br.servsimples.servsimples.model.*;
+import jakarta.annotation.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public class UserManager {
@@ -72,6 +74,20 @@ public class UserManager {
         return VALID_USER;
     }
 
+    /**
+     *
+     * @return the first availability in the list
+     */
+    public Availability availability() {
+        if (isNull()) return null;
+        return user.getAgenda().getAvailabilities().get(0);
+    }
+
+    public void availability(Availability availability) {
+        if (isNull()) return;
+        user.getAgenda().getAvailabilities().add(availability);
+    }
+
     public User user() {
         return user;
     }
@@ -115,7 +131,7 @@ public class UserManager {
         user.setUserName(username);
     }
 
-    public boolean userIsNull() {
+    public boolean isNull() {
         return this.user == null;
     }
 
@@ -170,5 +186,31 @@ public class UserManager {
     public void removeService(Service service) {
         if (user == null || service == null) return;
         user.getServices().removeIf(s -> Objects.equals(s.getId(), service.getId()));
+    }
+
+    public Agenda agenda() {
+        if (isNull()) return null;
+        return user.getAgenda();
+    }
+
+    /**
+     *
+     * @return the first Appointment in the list or Null
+     */
+    @Nullable
+    public Appointment appointment() {
+        if (user == null) return null;
+        Availability availability = user.getAgenda().getAvailabilities().get(0);
+        return availability == null ? null : availability.getAppointment();
+    }
+
+    public List<Availability> availabilities() {
+        if (isNull()) return null;
+        return user.getAgenda().getAvailabilities();
+    }
+
+    public long id() {
+        if (user == null) return  -1;
+        return user.getId();
     }
 }

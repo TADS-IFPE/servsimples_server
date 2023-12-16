@@ -8,7 +8,6 @@ package ifpe.edu.br.servsimples.servsimples.controller;
 import com.google.gson.Gson;
 import ifpe.edu.br.servsimples.servsimples.InterfacesWrapper;
 import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
-import ifpe.edu.br.servsimples.servsimples.autentication.Token;
 import ifpe.edu.br.servsimples.servsimples.managers.AuthManager;
 import ifpe.edu.br.servsimples.servsimples.managers.AvailabilityManager;
 import ifpe.edu.br.servsimples.servsimples.managers.ServiceManager;
@@ -65,29 +64,27 @@ public class MainController {
         ServSimplesApplication.logi(TAG, "registerAvailability: " + getUserInfoString(user) +
                 "availability info:" + getAvailabilityInfoToString(user.getAgenda().getAvailabilities().get(0)));
 
-        User restoredUser = mRepository.getUserByCPF(user.getCpf());
+        UserManager tranUserMgr = UserManager.create(user);
+        UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
 
-        if (restoredUser == null) {
+        if (restUserMgr.isNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
 
-        if (restoredUser.getUserType() != User.UserType.PROFESSIONAL) {
+        if (restUserMgr.type() != User.UserType.PROFESSIONAL) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_ALLOWED,
                     getErrorMessageByCode(UserManager.USER_NOT_ALLOWED));
         }
 
-        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
         return mAuthManager.handleTokenValidation(() -> {
-            UserManager manager = UserManager.create(user);
-
-
-            Availability newAvailability = user.getAgenda().getAvailabilities().get(0);
+            Availability newAvailability = tranUserMgr.availability();
             int availabilityValidationCode =
-                    mAvailabilityManager.getNewAvailabilityValidationCode(restoredUser.getAgenda(), newAvailability);
+                    mAvailabilityManager.getNewAvailabilityValidationCode(restUserMgr.agenda(), newAvailability);
             if (availabilityValidationCode == AvailabilityManager.AVAILABILITY_VALID) {
-                restoredUser.getAgenda().addAvailability(newAvailability);
-                mRepository.updateUser(restoredUser);
+                restUserMgr.availability(newAvailability);
+                mRepository.updateUser(restUserMgr.user());
             }
             return availabilityValidationCode;
         }, tokenValidationCode);
@@ -95,37 +92,36 @@ public class MainController {
 
     @PostMapping("api/register/user/appointment")
     public ResponseEntity<String> registerAppointment(@RequestBody AppointmentWrapper appointmentWrapper) {
-        ServSimplesApplication.logi(TAG, "[registerAppointment] user info:" + getUserInfoString(appointmentWrapper.getClient())
-                + " Appointment info:" + getAppointmentInfoString(appointmentWrapper.getClient().getAgenda().getAvailabilities().get(0).getAppointment()));
+        UserManager tranClientMgr = UserManager.create(appointmentWrapper.getClient());
+        UserManager tranProfessionalMgr = UserManager.create(appointmentWrapper.getProfessional());
+        ServSimplesApplication.logi(TAG, "[registerAppointment] user info:" + getUserInfoString(tranClientMgr.user())
+                + " Appointment info:" + getAppointmentInfoString(tranProfessionalMgr.appointment()));
 
-        User restoredClientUser = mRepository.getUserByCPF(appointmentWrapper.getClient().getCpf());
-        User restoredProfessionalUser = mRepository.getUserByCPF(appointmentWrapper.getProfessional().getCpf());
-
-        if (restoredClientUser == null || restoredProfessionalUser == null) {
+        UserManager rstClientMgr = UserManager.create(mRepository.getUserByCPF(tranClientMgr.cpf()));
+        UserManager rstProfessionalMgr = UserManager.create(mRepository.getUserByCPF(tranProfessionalMgr.cpf()));
+        if (rstClientMgr.isNull() || rstProfessionalMgr.isNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
-
-        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredClientUser,
-                appointmentWrapper.getClient().getTokenString());
-
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(rstClientMgr.user(), tranClientMgr.tokenString());
         return mAuthManager.handleTokenValidation(() -> {
-            if (mAvailabilityManager.isAppointmentValid(appointmentWrapper)) {
-                ServSimplesApplication.logi(TAG, "Appointment is valid");
-                AppointmentWrapper restoredUsersWrapper = new AppointmentWrapper();
-                restoredUsersWrapper.setProfessional(restoredProfessionalUser);
-                restoredUsersWrapper.setClient(restoredClientUser);
-                AppointmentWrapper result
-                        = mAvailabilityManager.performAppointmentRegistration(appointmentWrapper, restoredUsersWrapper);
-                if (result != null) {
-                    mRepository.updateUser(result.getProfessional());
-                    mRepository.updateUser(result.getClient());
-                    return true;
-                }
-                ServSimplesApplication.logi(TAG, "result wrapper is null");
+            if (!mAvailabilityManager.isAppointmentWrapperValid(appointmentWrapper)) {
+                ServSimplesApplication.logi(TAG, "Appointment is not valid");
                 return false;
             }
-            ServSimplesApplication.logi(TAG, "Appointment is not valid");
+            ServSimplesApplication.logi(TAG, "Appointment is valid");
+            AppointmentWrapper resultWrapper = mAvailabilityManager.performAppointmentRegistration(
+                    tranClientMgr,
+                    tranProfessionalMgr,
+                    rstClientMgr,
+                    rstProfessionalMgr
+            );
+            if (resultWrapper != null) {
+                mRepository.updateUser(resultWrapper.getProfessional());
+                mRepository.updateUser(resultWrapper.getClient());
+                return true;
+            }
+            ServSimplesApplication.logi(TAG, "result wrapper is null");
             return false;
         }, tokenValidationCode);
     }
@@ -156,7 +152,7 @@ public class MainController {
         int validationCode = tranUserMgr.loginValidationCode();
         if (validationCode == UserManager.VALID_USER) {
             UserManager restUserMgr = UserManager.create(mRepository.getUserByUsername(tranUserMgr.username()));
-            if (restUserMgr.userIsNull()) {
+            if (restUserMgr.isNull()) {
                 return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                         getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
             }
@@ -180,7 +176,7 @@ public class MainController {
         ServSimplesApplication.logi(TAG, "getUSer:" + getUserInfoString(user));
         UserManager tranUserMgr = UserManager.create(user);
         UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
-        if (restUserMgr.userIsNull()) {
+        if (restUserMgr.isNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
@@ -193,7 +189,7 @@ public class MainController {
         ServSimplesApplication.logi(TAG, "unregisterUser");
         UserManager tranUserMgr = UserManager.create(user);
         UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
-        if (restUserMgr.userIsNull()) {
+        if (restUserMgr.isNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
@@ -209,7 +205,7 @@ public class MainController {
         ServSimplesApplication.logi(TAG, "updateUser: " + getUserInfoString(user));
         UserManager tranUserMgr = UserManager.create(user);
         UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
-        if (restUserMgr.userIsNull()) {
+        if (restUserMgr.isNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
@@ -231,7 +227,7 @@ public class MainController {
         ServSimplesApplication.logi(TAG, "getCategories:" + getUserInfoString(user));
         UserManager tranUserMgr = UserManager.create(user);
         UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
-        if (restUserMgr.userIsNull()) {
+        if (restUserMgr.isNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
@@ -249,7 +245,7 @@ public class MainController {
                 " service info:" + getServiceInfoFromUserString(user));
         UserManager tranUserMgr = UserManager.create(user);
         UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
-        if (restUserMgr.userIsNull()) {
+        if (restUserMgr.isNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
@@ -278,7 +274,7 @@ public class MainController {
                 " service info:" + getServiceInfoFromUserString(user));
         UserManager tranUserMgr = UserManager.create(user);
         UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
-        if (restUserMgr.userIsNull()) {
+        if (restUserMgr.isNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
@@ -308,7 +304,7 @@ public class MainController {
                 " service info:" + getServiceInfoFromUserString(user));
         UserManager tranUserMgr = UserManager.create(user);
         UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
-        if (restUserMgr.userIsNull()) {
+        if (restUserMgr.isNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
@@ -337,7 +333,7 @@ public class MainController {
         ServSimplesApplication.logi(TAG, "getAllServicesByCategory:" + getUserInfoString(user));
         UserManager tranUserMgr = UserManager.create(user);
         UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
-        if (restUserMgr.userIsNull()) {
+        if (restUserMgr.isNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
@@ -352,7 +348,7 @@ public class MainController {
                 + " service info:" + getServiceInfoFromUserString(user));
         UserManager tranUserMgr = UserManager.create(user);
         UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
-        if (restUserMgr.userIsNull()) {
+        if (restUserMgr.isNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }

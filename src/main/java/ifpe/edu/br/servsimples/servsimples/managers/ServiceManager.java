@@ -41,12 +41,6 @@ public class ServiceManager {
         return SERVICE_VALID;
     }
 
-    public int getServiceValidationCode(List<Service> services) {
-        if (services.isEmpty()) return SERVICE_IS_EMPTY;
-        if (services.size() > 1) return SERVICE_DUPLICATE;
-        return getServiceValidationCode(services.get(0));
-    }
-
     public List<Service> getAllServicesByCategory(String category) {
         List<Service> services = null;
         try {

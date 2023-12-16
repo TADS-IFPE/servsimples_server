@@ -1,14 +1,18 @@
 package ifpe.edu.br.servsimples.servsimples;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import ifpe.edu.br.servsimples.servsimples.controller.MainController;
+import ifpe.edu.br.servsimples.servsimples.managers.AvailabilityManager;
 import ifpe.edu.br.servsimples.servsimples.model.*;
 import ifpe.edu.br.servsimples.servsimples.repo.ServiceRepo;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
+import ifpe.edu.br.servsimples.servsimples.utils.AppointmentWrapper;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.ResponseEntity;
 
 import java.time.LocalTime;
 import java.util.List;
@@ -20,6 +24,13 @@ import static ifpe.edu.br.servsimples.servsimples.ServSimplesApplication.MAIN_TA
 class UserControllerTest {
 
     private static final Logger logger = LoggerFactory.getLogger(ServSimplesApplication.class);
+    public static final String PROFESSIONAL_MOCK_CPF = "02154121454545478";
+    public static final String PROFESSIONAL_MOCK_NAME = "Professional user";
+    public static final String PROFESSIONAL_MOCK_PASSWORD = "123";
+    public static final String PROFESSIONAL_MOCK_USERNAME = "TEST_USERNAME46565465xxvs44";
+    public static final User.UserType PROFESSIONAL_MOCK_TYPE = User.UserType.PROFESSIONAL;
+    public static final String PROFESSIONAL_MOCK_BIO = "Bio 1";
+    public static final String USER_MOCK_BIO = "bio-slksdjdjdkl";
 
     private static void logi(String tag, String message) {
         logger.info("[" + MAIN_TAG + "] : [" + tag + "] :" + message);
@@ -39,9 +50,13 @@ class UserControllerTest {
     private final UserRepo userRepo;
     private final MainController userController;
 
+    private final ObjectMapper objectMapper;
+    private User currentUser;
+
     @Autowired
-    public UserControllerTest(UserRepo userRepo, ServiceRepo serviceRepo) {
+    public UserControllerTest(UserRepo userRepo, ServiceRepo serviceRepo, ObjectMapper objectMapper) {
         this.userRepo = userRepo;
+        this.objectMapper = objectMapper;
         userController = new MainController(userRepo, serviceRepo);
     }
 
@@ -54,6 +69,128 @@ class UserControllerTest {
     }
 
     @Test
+    public void registerAvailabilityTest() {
+        Availability av = new Availability();
+        av.setState(Availability.AVAILABLE);
+        av.setStartTime(100);
+        av.setEndTime(200);
+
+        User professional = getUserFromResponseEntity(userController.registerUser(getMockProfUser()));
+        assert professional != null;
+        checkMockedProfessionalInfo(professional);
+
+        professional.getAgenda().getAvailabilities().add(av);
+
+        Integer responseCode = getIntegerFromResponseEntity(userController.registerAvailability(professional));
+        logi(TAG, String.valueOf(responseCode));
+        assert responseCode == AvailabilityManager.AVAILABILITY_VALID;
+
+        userRepo.delete(professional);
+    }
+
+    @Test
+    public void registerAppointmentTest() {
+        Availability professionalAvailability = new Availability();
+        professionalAvailability.setState(Availability.AVAILABLE);
+        professionalAvailability.setStartTime(100);
+        professionalAvailability.setEndTime(200);
+
+        User professional = getUserFromResponseEntity(userController.registerUser(getMockProfUser()));
+        assert professional != null;
+
+        User client = getUserFromResponseEntity(userController.registerUser(getMockUser()));
+        assert client != null;
+
+        User prof = userRepo.findByCpf(professional.getCpf());
+        assert prof != null;
+        Appointment appointment = new Appointment();
+        appointment.setStartTime(100);
+        appointment.setEndTime(200);
+        appointment.setSubscriberId(prof.getId());
+
+        Availability clientAvailability = new Availability();
+        clientAvailability.setAppointment(appointment);
+        clientAvailability.setState(Availability.ON_HOLD);
+        clientAvailability.setStartTime(100);
+        clientAvailability.setEndTime(200);
+
+        client.getAgenda().addAvailability(clientAvailability);
+
+        professional.getAgenda().getAvailabilities().add(professionalAvailability);
+
+        Integer responseCode = getIntegerFromResponseEntity(userController.registerAvailability(professional));
+        logi(TAG, String.valueOf(responseCode));
+        assert responseCode == AvailabilityManager.AVAILABILITY_VALID;
+
+        AppointmentWrapper appointmentWrapper = new AppointmentWrapper();
+        appointmentWrapper.setProfessional(professional);
+        appointmentWrapper.setClient(client);
+
+        boolean booleanFromResponseEntity = getBooleanFromResponseEntity(userController.registerAppointment(appointmentWrapper));
+
+        if (booleanFromResponseEntity) {
+            User restoredProfessional = userRepo.findByCpf(professional.getCpf());
+            User restoredClient = userRepo.findByCpf(client.getCpf());
+
+            assert restoredProfessional != null;
+            assert restoredClient != null;
+
+            List<Availability> clientAvailabilities = restoredClient.getAgenda().getAvailabilities();
+            for (Availability a : clientAvailabilities) {
+                if (a.getStartTime() == clientAvailability.getStartTime() && a.getEndTime() == clientAvailability.getEndTime()) {
+                    assert a.getState() == Availability.ON_HOLD;
+                    Appointment clientAppointment = a.getAppointment();
+                    assert clientAppointment != null;
+                    assert clientAppointment.getSubscriberId() == restoredProfessional.getId();
+                    assert a.getStartTime() == clientAppointment.getStartTime();
+                    assert a.getEndTime() == clientAppointment.getEndTime();
+                }
+            }
+
+            List<Availability> professionalAv = restoredProfessional.getAgenda().getAvailabilities();
+            for (Availability av : professionalAv) {
+                if (av.getStartTime() == professionalAvailability.getStartTime() && av.getEndTime() == professionalAvailability.getStartTime()) {
+                    assert av.getState() == Availability.ON_HOLD;
+
+                    Appointment profAppointment = av.getAppointment();
+                    assert profAppointment != null;
+                    assert profAppointment.getSubscriberId() == restoredClient.getId();
+                    assert av.getStartTime() == profAppointment.getStartTime();
+                    assert av.getEndTime() == profAppointment.getEndTime();
+                }
+            }
+            userRepo.delete(restoredProfessional);
+            userRepo.delete(restoredClient);
+            assert true;
+        } else {
+            assert false;
+        }
+    }
+
+    public Integer getIntegerFromResponseEntity(ResponseEntity<String> response) {
+        if (response.getStatusCode().is2xxSuccessful()) {
+            try {
+                return objectMapper.readValue(response.getBody(), Integer.class);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return null;
+    }
+
+    public boolean getBooleanFromResponseEntity(ResponseEntity<String> response) {
+        if (response.getStatusCode().is2xxSuccessful()) {
+            try {
+                String responseBody = response.getBody();
+                return "true".equalsIgnoreCase(responseBody) || "1".equals(responseBody);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return false;
+    }
+
+
     public void unregisterUserTest() {
         registerMockedUser();
         User restoredUserBefore = userRepo.findByCpf(USER_MOCK_CPF);
@@ -63,7 +200,7 @@ class UserControllerTest {
         assert restoredUserAfter == null;
     }
 
-    @Test
+
     public void registerServiceTest() {
         final String SERVICE_NAME_MOCK = "NOME DO SERVIÇO MOCK";
         final String COST_TIME_MOCK = "HORA";
@@ -104,7 +241,6 @@ class UserControllerTest {
     }
 
 
-    @Deprecated
     public void testeAddEvento() {
         registerMockedUser();
         User restoredUser = userRepo.findByCpf(USER_MOCK_CPF);
@@ -129,8 +265,8 @@ class UserControllerTest {
         userRepo.delete(restoredUser3);
     }
 
-    @Test
-    public void testeee(){
+
+    public void testeee() {
         LocalTime now = LocalTime.now();
         //logger.debug(now.toString());
         assert true;
@@ -170,6 +306,17 @@ class UserControllerTest {
         assert user.getPassword().equals(USER_MOCK_PASSWORD);
         assert user.getUserName().equals(USER_MOCK_USERNAME);
         assert user.getUserType().equals(USER_MOCK_TYPE);
+        assert user.getBio().equals(USER_MOCK_BIO);
+    }
+
+    private void checkMockedProfessionalInfo(User professional) {
+        assert professional != null;
+        assert professional.getName().equals(PROFESSIONAL_MOCK_NAME);
+        assert professional.getCpf().equals(PROFESSIONAL_MOCK_CPF);
+        assert professional.getPassword().equals(PROFESSIONAL_MOCK_PASSWORD);
+        assert professional.getUserName().equals(PROFESSIONAL_MOCK_USERNAME);
+        assert professional.getUserType().equals(PROFESSIONAL_MOCK_TYPE);
+        assert professional.getBio().equals(PROFESSIONAL_MOCK_BIO);
     }
 
     private void checkEvent(Event reference, Event test) {
@@ -180,8 +327,23 @@ class UserControllerTest {
         assert reference.getType() == test.getType();
     }
 
-    private void registerMockedUser() {
-        userController.registerUser(getMockUser());
+    private User registerMockedUser() {
+        return getUserFromResponseEntity(userController.registerUser(getMockUser()));
+    }
+
+    public User getUserFromResponseEntity(ResponseEntity<String> response) {
+        if (response.getStatusCode().is2xxSuccessful()) {
+            try {
+                return objectMapper.readValue(response.getBody(), User.class);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return null;
+    }
+
+    private boolean userIsNull() {
+        return currentUser == null;
     }
 
     private User getMockUser() {
@@ -191,6 +353,18 @@ class UserControllerTest {
         user.setPassword(USER_MOCK_PASSWORD);
         user.setUserName(USER_MOCK_USERNAME);
         user.setUserType(USER_MOCK_TYPE);
+        user.setBio(USER_MOCK_BIO);
+        return user;
+    }
+
+    private User getMockProfUser() {
+        User user = new User();
+        user.setCpf(PROFESSIONAL_MOCK_CPF);
+        user.setName(PROFESSIONAL_MOCK_NAME);
+        user.setPassword(PROFESSIONAL_MOCK_PASSWORD);
+        user.setUserName(PROFESSIONAL_MOCK_USERNAME);
+        user.setUserType(PROFESSIONAL_MOCK_TYPE);
+        user.setBio(PROFESSIONAL_MOCK_BIO);
         return user;
     }
 }
