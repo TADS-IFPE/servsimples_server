@@ -5,14 +5,15 @@
  */
 package ifpe.edu.br.servsimples.servsimples.managers;
 
-import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
+import ifpe.edu.br.servsimples.servsimples.autentication.Token;
 import ifpe.edu.br.servsimples.servsimples.model.Service;
 import ifpe.edu.br.servsimples.servsimples.model.User;
-import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
+
+import java.util.Objects;
 
 public class UserManager {
 
-    public static final int USER_VALID = 0;
+    public static final int VALID_USER = 0;
     public static final int ERROR_NAME = 1;
     public static final int ERROR_USERNAME = 2;
     public static final int ERROR_PASSWORD = 3;
@@ -26,16 +27,19 @@ public class UserManager {
     public static final int MISSING_LOGIN_INFO = 11;
     public static final int LOGIN_INFO_LENGTH_ERROR = 12;
     public static final int USER_INFO_DUPLICATED = 13;
+    public static final int DUPLICATED_INFO = 14;
 
+    private final User user;
 
-    private final UserRepo userRepo;
-    private String TAG = UserManager.class.getSimpleName();
-
-    public UserManager(UserRepo userRepo) {
-        this.userRepo = userRepo;
+    private UserManager(User user) {
+        this.user = user;
     }
 
-    public int getUserInfoValidationCode(User user) {
+    public static UserManager create(User user) {
+        return new UserManager(user);
+    }
+
+    public int getRegisterValidationCode() {
         if (user == null) return USER_NULL;
         if (user.getUserName() == null || user.getUserName().isEmpty() || user.getUserName().isBlank() /*|| user.getUserName().length() != 64*/) {
             return ERROR_USERNAME;
@@ -53,48 +57,118 @@ public class UserManager {
                 user.getCpf().equals(user.getPassword())) {
             return USER_INFO_DUPLICATED;
         }
-        return USER_VALID;
+        return VALID_USER;
     }
 
-
-    public int getLoginInfoValidationCode(User user) {
+    public int loginValidationCode() {
+        if (user == null) return USER_NULL;
         String userName = user.getUserName();
         String password = user.getPassword();
-
         if (userName == null || userName.isEmpty() || userName.isBlank() ||
                 password == null || password.isEmpty() || password.isBlank()) {
             return MISSING_LOGIN_INFO;
         }
-
-        return USER_VALID;
+        if (userName.equals(password)) return DUPLICATED_INFO;
+        return VALID_USER;
     }
 
-    public User getUserByCPF(String cpf) {
-        return userRepo.findByCpf(cpf);
+    public User user() {
+        return user;
     }
 
-    public void removeUser(User restoredUser) {
-        userRepo.delete(restoredUser);
+    public void token(Token token) {
+        this.user.setToken(token.getEncryptedToken());
     }
 
-    public void updateUser(User restoredUser) {
-        save(restoredUser);
+    public String cpf () {
+        return user == null ? null : user.getCpf();
     }
 
-    public void save(User user) {
-        try {
-            userRepo.save(user);
-        } catch (Exception e) {
-            ServSimplesApplication.logi(TAG, "save user fail: "
-                    + e.getMessage());
+    public void cpf(String cpf) {
+        if (user == null) return;
+        user.setCpf(cpf);
+    }
+
+    public String name () {
+        return user == null ? null : user.getName();
+    }
+
+    public void name(String name) {
+        if (user == null) return;
+        user.setName(name);
+    }
+
+    public User.UserType type () {
+        return user == null ? null : user.getUserType();
+    }
+
+    public void type(User.UserType type) {
+        if (user == null) return;
+        user.setUserType(type);
+    }
+    public String username() {
+        return user == null ? null : user.getUserName();
+    }
+
+    public void username(String username) {
+        if (user == null) return;
+        user.setUserName(username);
+    }
+
+    public boolean userIsNull() {
+        return this.user == null;
+    }
+
+    public String tokenString() {
+        return user == null ? null : user.getTokenString();
+    }
+
+    public String bio () {
+        return user == null ? null : user.getBio();
+    }
+
+    public void bio(String bio) {
+        if (user == null) return;
+        user.setBio(bio);
+    }
+
+    public String password () {
+        return user == null ? null : user.getPassword();
+    }
+
+    public void password(String password) {
+        if (user == null) return;
+        user.setPassword(password);
+    }
+
+    public void service(Service service) {
+        if (user == null) return;
+        user.getServices().add(service);
+    }
+
+    /**
+     *
+     * @return the first Service in the list or null if empty or
+     * if user is null
+     */
+    public Service service() {
+        return user == null ? null : user.getServices().get(0);
+    }
+
+    public void updateService(Service newService) {
+        if (user == null || newService == null) return;
+        for (Service s: user.getServices()) {
+            if (Objects.equals(s.getId(), newService.getId())) {
+                s.setCost(newService.getCost());
+                s.setName(newService.getName());
+                s.setCategory(newService.getCategory());
+                s.setDescription(newService.getDescription());
+            }
         }
     }
 
-    public User getUserByUsername(String userName) {
-        return userRepo.findByUserName(userName);
-    }
-
-    public User getUserByService(Service service) {
-        return userRepo.findUsersByServicesContaining(service);
+    public void removeService(Service service) {
+        if (user == null || service == null) return;
+        user.getServices().removeIf(s -> Objects.equals(s.getId(), service.getId()));
     }
 }

@@ -97,17 +97,8 @@ public class User {
         this.password = password;
     }
 
-    public void updateService(Service editedService) {
-        for (Service s: services) {
-            if (Objects.equals(s.getId(), editedService.getId())) {
-                s.setCost(editedService.getCost());
-                s.setName(editedService.getName());
-                s.setCategory(editedService.getCategory());
-                s.setDescription(editedService.getDescription());
-            }
-        }
-    }
 
+    @Deprecated
     public void unregisterService(Service serviceToRemove) {
         services.removeIf(s -> Objects.equals(s.getId(), serviceToRemove.getId()));
     }

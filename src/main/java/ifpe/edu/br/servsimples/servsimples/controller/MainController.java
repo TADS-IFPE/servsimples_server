@@ -17,6 +17,7 @@ import ifpe.edu.br.servsimples.servsimples.model.Appointment;
 import ifpe.edu.br.servsimples.servsimples.model.Availability;
 import ifpe.edu.br.servsimples.servsimples.model.Service;
 import ifpe.edu.br.servsimples.servsimples.model.User;
+import ifpe.edu.br.servsimples.servsimples.repo.Repository;
 import ifpe.edu.br.servsimples.servsimples.repo.ServiceRepo;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
 import ifpe.edu.br.servsimples.servsimples.utils.AppointmentWrapper;
@@ -39,16 +40,14 @@ public class MainController {
 
     private static final String TAG = MainController.class.getSimpleName();
 
-    private final UserRepo userRepo;
-    private final UserManager mUserManager;
     private final ServiceManager mServiceManager;
     private final AuthManager mAuthManager;
     private final AvailabilityManager mAvailabilityManager;
+    private final Repository mRepository;
 
     @Autowired
-    public MainController(UserRepo userController, ServiceRepo serviceRepo) {
-        this.userRepo = userController;
-        mUserManager = new UserManager(userRepo);
+    public MainController(UserRepo userRepo, ServiceRepo serviceRepo) {
+        mRepository = Repository.create(userRepo, serviceRepo);
         mServiceManager = new ServiceManager(serviceRepo);
         mAuthManager = AuthManager.getInstance();
         mAvailabilityManager = new AvailabilityManager();
@@ -66,7 +65,7 @@ public class MainController {
         ServSimplesApplication.logi(TAG, "registerAvailability: " + getUserInfoString(user) +
                 "availability info:" + getAvailabilityInfoToString(user.getAgenda().getAvailabilities().get(0)));
 
-        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
+        User restoredUser = mRepository.getUserByCPF(user.getCpf());
 
         if (restoredUser == null) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
@@ -80,12 +79,15 @@ public class MainController {
 
         int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
         return mAuthManager.handleTokenValidation(() -> {
+            UserManager manager = UserManager.create(user);
+
+
             Availability newAvailability = user.getAgenda().getAvailabilities().get(0);
             int availabilityValidationCode =
                     mAvailabilityManager.getNewAvailabilityValidationCode(restoredUser.getAgenda(), newAvailability);
             if (availabilityValidationCode == AvailabilityManager.AVAILABILITY_VALID) {
                 restoredUser.getAgenda().addAvailability(newAvailability);
-                mUserManager.updateUser(restoredUser);
+                mRepository.updateUser(restoredUser);
             }
             return availabilityValidationCode;
         }, tokenValidationCode);
@@ -96,8 +98,8 @@ public class MainController {
         ServSimplesApplication.logi(TAG, "[registerAppointment] user info:" + getUserInfoString(appointmentWrapper.getClient())
                 + " Appointment info:" + getAppointmentInfoString(appointmentWrapper.getClient().getAgenda().getAvailabilities().get(0).getAppointment()));
 
-        User restoredClientUser = mUserManager.getUserByCPF(appointmentWrapper.getClient().getCpf());
-        User restoredProfessionalUser = mUserManager.getUserByCPF(appointmentWrapper.getProfessional().getCpf());
+        User restoredClientUser = mRepository.getUserByCPF(appointmentWrapper.getClient().getCpf());
+        User restoredProfessionalUser = mRepository.getUserByCPF(appointmentWrapper.getProfessional().getCpf());
 
         if (restoredClientUser == null || restoredProfessionalUser == null) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
@@ -116,8 +118,8 @@ public class MainController {
                 AppointmentWrapper result
                         = mAvailabilityManager.performAppointmentRegistration(appointmentWrapper, restoredUsersWrapper);
                 if (result != null) {
-                    mUserManager.updateUser(result.getProfessional());
-                    mUserManager.updateUser(result.getClient());
+                    mRepository.updateUser(result.getProfessional());
+                    mRepository.updateUser(result.getClient());
                     return true;
                 }
                 ServSimplesApplication.logi(TAG, "result wrapper is null");
@@ -131,76 +133,73 @@ public class MainController {
     @PostMapping("api/register/user")
     public ResponseEntity<String> registerUser(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "registerUser: " + getUserInfoString(user));
-        int validationCode = mUserManager.getUserInfoValidationCode(user);
-        if (validationCode == UserManager.USER_VALID) {
-            User restoredUser = mUserManager.getUserByCPF(user.getCpf());
+        UserManager userManager = UserManager.create(user);
+        int validationCode = userManager.getRegisterValidationCode();
+        if (validationCode == UserManager.VALID_USER) {
+            User restoredUser = mRepository.getUserByCPF(user.getCpf());
             if (restoredUser != null) {
                 return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_EXISTS,
                         getErrorMessageByCode(UserManager.USER_EXISTS));
             }
-            Token token = mAuthManager.getTokenForUser(user, true);
-            User responseUser = new User();
-            responseUser.setToken(token.getEncryptedToken());
-            responseUser.setCpf(user.getCpf());
-            responseUser.setUserType(user.getUserType());
-            responseUser.setName(user.getName());
-            mUserManager.save(user);
-            return getResponseEntityFrom(HttpStatus.OK, responseUser);
+            mRepository.saveUser(userManager.user());
+            userManager.token(mAuthManager.createTokenForUser(userManager.user()));
+            return getResponseEntityFrom(HttpStatus.OK, userManager.user());
         }
         return getResponseEntityFrom(HttpStatus.FORBIDDEN,
                 getErrorMessageByCode(validationCode));
     }
 
     @PostMapping("api/login")
-    public ResponseEntity<String> login(@RequestBody User user) {
-        ServSimplesApplication.logi(TAG, "login:" + getUserInfoString(user));
-        int userValidationCode = mUserManager.getLoginInfoValidationCode(user);
-        if (userValidationCode == UserManager.USER_VALID) {
-            User restoredUser = mUserManager.getUserByUsername(user.getUserName());
-            if (restoredUser == null) {
+    public ResponseEntity<String> login(@RequestBody User transactionUser) {
+        ServSimplesApplication.logi(TAG, "login:" + getUserInfoString(transactionUser));
+        UserManager tranUserMgr = UserManager.create(transactionUser);
+        int validationCode = tranUserMgr.loginValidationCode();
+        if (validationCode == UserManager.VALID_USER) {
+            UserManager restUserMgr = UserManager.create(mRepository.getUserByUsername(tranUserMgr.username()));
+            if (restUserMgr.userIsNull()) {
                 return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                         getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
             }
-            int loginValidationCode = mAuthManager.getLoginValidationCode(user, restoredUser);
+            int loginValidationCode = mAuthManager.getLoginValidationCode(tranUserMgr.user(), restUserMgr.user());
             if (loginValidationCode == AuthManager.USER_INFO_NOT_MATCH) {
                 return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_INFO_NOT_MATCH,
                         getErrorMessageByCode(AuthManager.USER_INFO_NOT_MATCH));
             }
-            Token token = mAuthManager.getTokenForUser(user, true);
-            User responseUser = new User();
-            responseUser.setToken(token.getEncryptedToken());
-            responseUser.setCpf(restoredUser.getCpf());
-            responseUser.setName(restoredUser.getName());
-            responseUser.setUserType(restoredUser.getUserType());
-            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.OK, responseUser);
+            tranUserMgr.token(mAuthManager.createTokenForUser(tranUserMgr.user()));
+            tranUserMgr.cpf(restUserMgr.cpf());
+            tranUserMgr.name(restUserMgr.name());
+            tranUserMgr.type(restUserMgr.type());
+            return getResponseEntityFrom(HttpStatus.OK, tranUserMgr.user());
         }
         return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_INVALID,
-                getErrorMessageByCode(userValidationCode));
+                getErrorMessageByCode(validationCode));
     }
 
     @PostMapping("api/get/user")
     public ResponseEntity<String> getUSer(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "getUSer:" + getUserInfoString(user));
-        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
-        if (restoredUser == null) {
+        UserManager tranUserMgr = UserManager.create(user);
+        UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
+        if (restUserMgr.userIsNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
-        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
-        return mAuthManager.handleTokenValidation(() -> restoredUser, tokenValidationCode);
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
+        return mAuthManager.handleTokenValidation(restUserMgr::user, tokenValidationCode);
     }
 
     @PostMapping("api/unregister/user")
     public ResponseEntity<String> unregisterUser(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "unregisterUser");
-        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
-        if (restoredUser == null) {
+        UserManager tranUserMgr = UserManager.create(user);
+        UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
+        if (restUserMgr.userIsNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
-        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
         return mAuthManager.handleTokenValidation(() -> {
-            mUserManager.removeUser(restoredUser);
+            mRepository.removeUser(restUserMgr.user());
             return null;
         }, tokenValidationCode);
     }
@@ -208,45 +207,39 @@ public class MainController {
     @PostMapping("api/update/user")
     public ResponseEntity<String> updateUser(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "updateUser: " + getUserInfoString(user));
-        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
-        if (restoredUser == null) {
+        UserManager tranUserMgr = UserManager.create(user);
+        UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
+        if (restUserMgr.userIsNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
-        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
         return mAuthManager.handleTokenValidation(() -> {
-            restoredUser.setUserName(user.getUserName());
-            restoredUser.setBio(user.getBio());
-            restoredUser.setPassword(user.getPassword());
-            restoredUser.setUserType(user.getUserType());
-            restoredUser.setName(user.getName());
-            mUserManager.updateUser(restoredUser);
-
-            Token token = mAuthManager.getTokenForUser(restoredUser, true);
-            User responseUser = new User();
-            responseUser.setToken(token.getEncryptedToken());
-            responseUser.setUserType(user.getUserType());
-            responseUser.setUserName(user.getUserName());
-            responseUser.setCpf(user.getCpf());
-            responseUser.setName(user.getName());
-            responseUser.setBio(user.getBio());
-            return responseUser;
+            restUserMgr.username(tranUserMgr.username());
+            restUserMgr.bio(tranUserMgr.bio());
+            restUserMgr.password(tranUserMgr.password());
+            restUserMgr.type(tranUserMgr.type());
+            restUserMgr.name(tranUserMgr.name());
+            mRepository.updateUser(restUserMgr.user());
+            tranUserMgr.token(mAuthManager.createTokenForUser(tranUserMgr.user()));
+            return tranUserMgr.user();
         }, tokenValidationCode);
     }
 
     @PostMapping("api/get/service/categories")
     public ResponseEntity<String> getCategories(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "getCategories:" + getUserInfoString(user));
-        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
-        if (restoredUser == null) {
+        UserManager tranUserMgr = UserManager.create(user);
+        UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
+        if (restUserMgr.userIsNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
-        if (restoredUser.getUserType() != User.UserType.PROFESSIONAL) {
+        if (restUserMgr.type() != User.UserType.PROFESSIONAL) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_ALLOWED,
                     getErrorMessageByCode(UserManager.USER_NOT_ALLOWED));
         }
-        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
         return mAuthManager.handleTokenValidation(this::getMockCategories, tokenValidationCode);
     }
 
@@ -254,59 +247,58 @@ public class MainController {
     public ResponseEntity<String> registerService(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "registerService:" + getUserInfoString(user) +
                 " service info:" + getServiceInfoFromUserString(user));
-        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
-        if (restoredUser == null) {
+        UserManager tranUserMgr = UserManager.create(user);
+        UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
+        if (restUserMgr.userIsNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
-        if (restoredUser.getUserType() != User.UserType.PROFESSIONAL) {
+        if (restUserMgr.type() != User.UserType.PROFESSIONAL) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_ALLOWED,
                     getErrorMessageByCode(UserManager.USER_NOT_ALLOWED));
         }
 
-        int serviceValidationCode = mServiceManager.getServiceValidationCode(user.getServices());
+        int serviceValidationCode = mServiceManager.getServiceValidationCode(tranUserMgr.service());
         if (serviceValidationCode != ServiceManager.SERVICE_VALID) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.SERVICE_INVALID,
                     getErrorMessageByCode(serviceValidationCode));
         }
 
-        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
         return mAuthManager.handleTokenValidation(() -> {
-            restoredUser.addService(user.getServices().get(0));
-            mUserManager.updateUser(restoredUser);
-            return user;
+            restUserMgr.service(tranUserMgr.service());
+            mRepository.updateUser(restUserMgr.user());
+            return tranUserMgr.user();
         }, tokenValidationCode);
     }
 
     @PostMapping("api/update/service")
-    public ResponseEntity<String> getServiceInfoString(@RequestBody User user) {
+    public ResponseEntity<String> updateService(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "updateService:" + getUserInfoString(user) +
                 " service info:" + getServiceInfoFromUserString(user));
-
-        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
-
-        if (restoredUser == null) {
+        UserManager tranUserMgr = UserManager.create(user);
+        UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
+        if (restUserMgr.userIsNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
-        if (restoredUser.getUserType() != User.UserType.PROFESSIONAL) {
+        if (restUserMgr.type() != User.UserType.PROFESSIONAL) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_ALLOWED,
                     getErrorMessageByCode(UserManager.USER_NOT_ALLOWED));
         }
 
-        int serviceValidationCode = mServiceManager.getServiceValidationCode(user.getServices());
+        int serviceValidationCode = mServiceManager.getServiceValidationCode(tranUserMgr.service());
         if (serviceValidationCode != ServiceManager.SERVICE_VALID) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.SERVICE_INVALID,
                     getErrorMessageByCode(serviceValidationCode));
         }
 
-        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
 
         return mAuthManager.handleTokenValidation(() -> {
-            Service editedService = user.getServices().get(0);
-            restoredUser.updateService(editedService);
-            mUserManager.updateUser(restoredUser);
-            return user;
+            restUserMgr.updateService(tranUserMgr.service());
+            mRepository.updateUser(restUserMgr.user());
+            return tranUserMgr.user();
         }, tokenValidationCode);
     }
 
@@ -314,73 +306,65 @@ public class MainController {
     public ResponseEntity<String> unregisterService(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "unregisterService:" + getUserInfoString(user) +
                 " service info:" + getServiceInfoFromUserString(user));
-
-        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
-
-        if (restoredUser == null) {
+        UserManager tranUserMgr = UserManager.create(user);
+        UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
+        if (restUserMgr.userIsNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
-        if (restoredUser.getUserType() != User.UserType.PROFESSIONAL) {
+        if (restUserMgr.type() != User.UserType.PROFESSIONAL) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_ALLOWED,
                     getErrorMessageByCode(UserManager.USER_NOT_ALLOWED));
         }
 
-        int serviceValidationCode = mServiceManager.getServiceValidationCode(user.getServices());
+        int serviceValidationCode = mServiceManager.getServiceValidationCode(tranUserMgr.service());
         if (serviceValidationCode != ServiceManager.SERVICE_VALID) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.SERVICE_INVALID,
                     getErrorMessageByCode(serviceValidationCode));
         }
 
-        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString());
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
 
         return mAuthManager.handleTokenValidation(() -> {
-            Service serviceToRemove = user.getServices().get(0);
-            restoredUser.unregisterService(serviceToRemove);
-            mUserManager.updateUser(restoredUser);
-            return user;
+            restUserMgr.removeService(tranUserMgr.service());
+            mRepository.updateUser(restUserMgr.user());
+            return tranUserMgr.user();
         }, tokenValidationCode);
     }
 
     @PostMapping("api/get/service/by/category")
     public ResponseEntity<String> getAllServicesByCategory(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "getAllServicesByCategory:" + getUserInfoString(user));
-
-        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
-
-        if (restoredUser == null) {
+        UserManager tranUserMgr = UserManager.create(user);
+        UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
+        if (restUserMgr.userIsNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
-
         return mAuthManager.handleTokenValidation(() ->
-                        mServiceManager
-                                .getAllServicesByCategory(user.getServices()
-                                        .get(0)
-                                        .getCategory()),
-                mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString()));
+                        mServiceManager.getAllServicesByCategory(tranUserMgr.service().getCategory()),
+                mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString()));
     }
 
     @PostMapping("api/get/user/by/service")
     public ResponseEntity<String> getUserFromService(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "getUserFromService:" + getUserInfoString(user)
                 + " service info:" + getServiceInfoFromUserString(user));
-
-        User restoredUser = mUserManager.getUserByCPF(user.getCpf());
-
-        if (restoredUser == null) {
+        UserManager tranUserMgr = UserManager.create(user);
+        UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
+        if (restUserMgr.userIsNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
         return mAuthManager.handleTokenValidation(
                 () -> {
-                    User userByService = mUserManager.getUserByService(user.getServices().get(0));
+                    User userByService = mRepository.getUserByService(tranUserMgr.service());
                     User responseUser = new User();
                     responseUser.setBio(userByService.getBio());
                     responseUser.setName(userByService.getName());
                     return responseUser;
                 },
-                mAuthManager.getTokenValidationCode(restoredUser, user.getTokenString()));
+                mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString()));
     }
 
     private List<String> getMockCategories() {
@@ -406,7 +390,7 @@ public class MainController {
             case UserManager.USER_EXISTS -> "USER EXISTS";
             case UserManager.USER_NOT_EXISTS -> "USER NOT EXISTS";
             case UserManager.USER_NOT_ALLOWED -> "USER NOT ALLOWED";
-            case UserManager.USER_VALID -> "USER VALID";
+            case UserManager.VALID_USER -> "USER VALID";
             case UserManager.PASSWORD_MISMATCH -> "PASSWORD MISMATCH";
             case UserManager.USERNAME_MISMATCH -> "USERNAME MISMATCH";
             case UserManager.MISSING_LOGIN_INFO -> "MISSING LOGIN INFO";

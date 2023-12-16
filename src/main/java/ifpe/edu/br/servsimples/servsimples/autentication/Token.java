@@ -1,7 +1,7 @@
 package ifpe.edu.br.servsimples.servsimples.autentication;
 
-import ifpe.edu.br.servsimples.servsimples.managers.AuthManager;
 import ifpe.edu.br.servsimples.servsimples.model.User;
+import ifpe.edu.br.servsimples.servsimples.utils.CryptoHelper;
 
 public class Token {
 
@@ -15,7 +15,7 @@ public class Token {
         long timestamp = builder.timeStamp;
         boolean sessionState = builder.sessionState;
         User user = builder.user;
-        this.encryptedToken = AuthManager.getInstance().encrypt(user.getUserName()
+        this.encryptedToken = CryptoHelper.encrypt(user.getUserName()
                 + ":" + user.getPassword() + "*" + timestamp + "$" + sessionState + "#");
     }
 

@@ -1,19 +1,15 @@
 package ifpe.edu.br.servsimples.servsimples.managers;
 
 import ifpe.edu.br.servsimples.servsimples.InterfacesWrapper;
-import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
 import ifpe.edu.br.servsimples.servsimples.autentication.Token;
 import ifpe.edu.br.servsimples.servsimples.controller.MainController;
 import ifpe.edu.br.servsimples.servsimples.model.User;
+import ifpe.edu.br.servsimples.servsimples.utils.CryptoHelper;
 import org.springframework.http.ResponseEntity;
 
-import javax.crypto.Cipher;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
-import java.util.Base64;
 import java.util.Date;
 
-public class AuthManager extends Manager{
+public class AuthManager extends Manager {
 
     private static final String MASTER_KEY = "serv?simpl3sK3yifp3202eT@d5w1ll#";
     private static final String TAG = AuthManager.class.getSimpleName();
@@ -47,30 +43,11 @@ public class AuthManager extends Manager{
     }
 
     /**
-     * Move to cryptohelper class
-     * @param content
-     * @return
-     */
-    @Deprecated
-    public String encrypt(String content) {
-        try {
-            SecretKey secretKey = new SecretKeySpec(MASTER_KEY.getBytes(), "AES");
-            Cipher cipher = Cipher.getInstance("AES");
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey);
-            byte[] encryptedBytes = cipher.doFinal(content.getBytes());
-            return Base64.getEncoder().encodeToString(encryptedBytes);
-        } catch (Exception e) {
-            ServSimplesApplication.logi(TAG, "encryption error:" + e.getMessage());
-            return null;
-        }
-    }
-
-    /**
      * This method verifies if the token is valid, if so
      * the method InterfacesWrapper.ITokenValidation#onSuccess() is called.
      * However, the response is based on the token validation issue.
      *
-     * @param func the routine that mus be executed in case of success token validation
+     * @param func                the routine that mus be executed in case of success token validation
      * @param tokenValidationCode the code that indicates the token validation status
      * @return an object with request information to be sent to user
      */
@@ -101,24 +78,9 @@ public class AuthManager extends Manager{
         return response;
     }
 
-
-
-
-    private String decrypt(String encryptedText) {
-        try {
-            SecretKey secretKey = new SecretKeySpec(MASTER_KEY.getBytes(), "AES");
-            Cipher cipher = Cipher.getInstance("AES");
-            cipher.init(Cipher.DECRYPT_MODE, secretKey);
-            byte[] decryptedBytes = cipher.doFinal(Base64.getDecoder().decode(encryptedText));
-            return new String(decryptedBytes);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    public Token getTokenForUser(User user, boolean isUserLoggedIn) {
+    public Token createTokenForUser(User user) {
         return new Token.Builder(user)
-                .addState(isUserLoggedIn)
+                .addState(true)
                 .addTimeStamp(new Date().getTime())
                 .build();
     }
@@ -129,7 +91,7 @@ public class AuthManager extends Manager{
         if (token == null || token.isEmpty()) {
             return TOKEN_NOT_PRESENT;
         }
-        String decrypt = decrypt(token);
+        String decrypt = CryptoHelper.decrypt(token);
         if (decrypt == null) {
             return TOKEN_INVALID;
         }
@@ -164,8 +126,7 @@ public class AuthManager extends Manager{
      * This API is a workaround to verify the token just when updating a user
      *
      * @param userFromRequest the user that came from request
-     * @param restoredUser user from db
-     *
+     * @param restoredUser    user from db
      * @return the token validation code
      */
     @Deprecated
@@ -174,7 +135,7 @@ public class AuthManager extends Manager{
         if (token == null || token.isEmpty()) {
             return TOKEN_NOT_PRESENT;
         }
-        String decrypt = decrypt(token);
+        String decrypt = CryptoHelper.decrypt(token);
         if (decrypt == null) {
             return TOKEN_INVALID;
         }
@@ -191,9 +152,9 @@ public class AuthManager extends Manager{
         String state = decrypt.substring(stateStartIndex + 1, stateEndIndex);
         boolean isLoggedIn = state.equals("true");
 
-        if (!username.equals(restoredUser.getUserName()) )
+        if (!username.equals(restoredUser.getUserName()))
             return USERNAME_INVALID;
-        if (!password.equals(restoredUser.getPassword()) )
+        if (!password.equals(restoredUser.getPassword()))
             return PASSWORD_INVALID;
         if (!isLoggedIn) return USER_NOT_LOGGED_IN;
 
@@ -208,8 +169,7 @@ public class AuthManager extends Manager{
         if (restoredUser.getPassword().equals(user.getPassword()) &&
                 restoredUser.getUserName().equals(user.getUserName())) {
             return USER_INFO_MATCH;
-        }
-        else {
+        } else {
             return USER_INFO_NOT_MATCH;
         }
     }
@@ -219,7 +179,7 @@ public class AuthManager extends Manager{
             return TOKEN_NOT_PRESENT;
         }
 
-        String decryptedToken = decrypt(token);
+        String decryptedToken = CryptoHelper.decrypt(token);
         if (decryptedToken == null) {
             return TOKEN_DECRYPT_FAILURE;
         }
@@ -234,6 +194,8 @@ public class AuthManager extends Manager{
         Long now = new Date().getTime();
         long delta = now - timeStampLong;
         if (delta > (ONE_HOUR)) return TOKEN_EXPIRED;
+
+        if (!getSessionStateFromDecryptedToken(decryptedToken)) return USER_NOT_LOGGED_IN;
 
         return TOKEN_VALID;
     }
