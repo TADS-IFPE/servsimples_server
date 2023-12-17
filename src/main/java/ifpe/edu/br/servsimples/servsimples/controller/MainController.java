@@ -93,26 +93,18 @@ public class MainController {
     @PostMapping("api/register/user/appointment")
     public ResponseEntity<String> registerAppointment(@RequestBody AppointmentWrapper appointmentWrapper) {
         UserManager tranClientMgr = UserManager.create(appointmentWrapper.getClient());
-        UserManager tranProfessionalMgr = UserManager.create(appointmentWrapper.getProfessional());
+        UserManager rstProfessionalMgr = UserManager.create(mRepository.getUserByCPF(appointmentWrapper.getProfessional().getCpf()));
         ServSimplesApplication.logi(TAG, "[registerAppointment] user info:" + getUserInfoString(tranClientMgr.user())
-                + " Appointment info:" + getAppointmentInfoString(tranProfessionalMgr.appointment()));
-
+                + " Professional info:" + getUserInfoString(appointmentWrapper.getProfessional()) + " Appointment info:" + getAppointmentInfoString(tranClientMgr.appointment()));
         UserManager rstClientMgr = UserManager.create(mRepository.getUserByCPF(tranClientMgr.cpf()));
-        UserManager rstProfessionalMgr = UserManager.create(mRepository.getUserByCPF(tranProfessionalMgr.cpf()));
         if (rstClientMgr.isNull() || rstProfessionalMgr.isNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
         int tokenValidationCode = mAuthManager.getTokenValidationCode(rstClientMgr.user(), tranClientMgr.tokenString());
         return mAuthManager.handleTokenValidation(() -> {
-            if (!mAvailabilityManager.isAppointmentWrapperValid(appointmentWrapper)) {
-                ServSimplesApplication.logi(TAG, "Appointment is not valid");
-                return false;
-            }
-            ServSimplesApplication.logi(TAG, "Appointment is valid");
             AppointmentWrapper resultWrapper = mAvailabilityManager.performAppointmentRegistration(
-                    tranClientMgr,
-                    tranProfessionalMgr,
+                    tranClientMgr.appointment(),
                     rstClientMgr,
                     rstProfessionalMgr
             );
@@ -132,7 +124,7 @@ public class MainController {
         UserManager userManager = UserManager.create(user);
         int validationCode = userManager.getRegisterValidationCode();
         if (validationCode == UserManager.VALID_USER) {
-            User restoredUser = mRepository.getUserByCPF(user.getCpf());
+            User restoredUser = mRepository.getUserByCPF(userManager.cpf());
             if (restoredUser != null) {
                 return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_EXISTS,
                         getErrorMessageByCode(UserManager.USER_EXISTS));

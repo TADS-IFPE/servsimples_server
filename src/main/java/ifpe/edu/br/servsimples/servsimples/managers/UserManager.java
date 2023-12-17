@@ -9,7 +9,6 @@ import ifpe.edu.br.servsimples.servsimples.autentication.Token;
 import ifpe.edu.br.servsimples.servsimples.model.*;
 import jakarta.annotation.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -212,5 +211,10 @@ public class UserManager {
     public long id() {
         if (user == null) return  -1;
         return user.getId();
+    }
+
+    public void notification(Notification notification) {
+        if (isNull()) return;
+        this.user.getNotifications().add(notification);
     }
 }
