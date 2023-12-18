@@ -67,6 +67,48 @@ class UserControllerTest {
     }
 
     @Test
+    public void getUserTest() {
+        final String LOCAL_PROFESSIONAL_CPF = "0999288938398";
+        final User.UserType LOCAL_PROFESSIONAL_TYPE = User.UserType.PROFESSIONAL;
+        final String LOCAL_PROFESSIONAL_NAME = "professional name";
+        final String LOCAL_PROFESSIONAL_USERNAME = "professional user name";
+        final String LOCAL_PROFESSIONAL_BIO = "professional user bio";
+        final String LOCAL_PROFESSIONAL_PASSWORD = "professional user password";
+
+        User localProfessional = new User();
+        localProfessional.setCpf(LOCAL_PROFESSIONAL_CPF);
+        localProfessional.setUserType(LOCAL_PROFESSIONAL_TYPE);
+        localProfessional.setName(LOCAL_PROFESSIONAL_NAME);
+        localProfessional.setUserName(LOCAL_PROFESSIONAL_USERNAME);
+        localProfessional.setBio(LOCAL_PROFESSIONAL_BIO);
+        localProfessional.setPassword(LOCAL_PROFESSIONAL_PASSWORD);
+
+        User professionalFromServerResponse = getUserFromResponseEntity(userController.registerUser(localProfessional));
+        assert professionalFromServerResponse != null;
+        assert professionalFromServerResponse.getCpf().equals(LOCAL_PROFESSIONAL_CPF);
+        assert professionalFromServerResponse.getUserType().equals(LOCAL_PROFESSIONAL_TYPE);
+        assert professionalFromServerResponse.getName().equals(LOCAL_PROFESSIONAL_NAME);
+        assert professionalFromServerResponse.getUserName().equals(LOCAL_PROFESSIONAL_USERNAME);
+        assert professionalFromServerResponse.getBio().equals(LOCAL_PROFESSIONAL_BIO);
+        assert professionalFromServerResponse.getPassword().equals(LOCAL_PROFESSIONAL_PASSWORD);
+        assert professionalFromServerResponse.getTokenString() != null;
+        assert professionalFromServerResponse.getAgenda().getAvailabilities().isEmpty();
+
+        User userFromResponseEntity = getUserFromResponseEntity(userController.getUSer(professionalFromServerResponse));
+        assert userFromResponseEntity != null;
+        assert userFromResponseEntity.getCpf().equals(LOCAL_PROFESSIONAL_CPF);
+        assert userFromResponseEntity.getUserType().equals(LOCAL_PROFESSIONAL_TYPE);
+        assert userFromResponseEntity.getName().equals(LOCAL_PROFESSIONAL_NAME);
+        assert userFromResponseEntity.getUserName().equals(LOCAL_PROFESSIONAL_USERNAME);
+        assert userFromResponseEntity.getBio().equals(LOCAL_PROFESSIONAL_BIO);
+        assert userFromResponseEntity.getPassword().equals(LOCAL_PROFESSIONAL_PASSWORD);
+        assert userFromResponseEntity.getTokenString() == null;
+
+        User restoredUser = userRepo.findByCpf(LOCAL_PROFESSIONAL_CPF);
+        userRepo.delete(restoredUser);
+    }
+
+    @Test
     public void registerAvailabilityTest() {
         final String LOCAL_PROFESSIONAL_CPF = "0999288938398";
         final User.UserType LOCAL_PROFESSIONAL_TYPE = User.UserType.PROFESSIONAL;

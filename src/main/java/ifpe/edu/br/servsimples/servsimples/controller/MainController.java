@@ -58,12 +58,13 @@ public class MainController {
         long time = date.getTime();
         ServSimplesApplication.logi(TAG, "now: " + convertToHumanReadable(time));
     }
-
     @PostMapping("api/register/user/availability")
     public ResponseEntity<String> registerAvailability(@RequestBody User user) {
-        ServSimplesApplication.logi(TAG, "registerAvailability: " + getUserInfoString(user) +
-                "availability info:" + getAvailabilityInfoToString(user.getAgenda().getAvailabilities().get(0)));
-
+        ServSimplesApplication.logi(TAG, "registerAvailability: " + getUserInfoString(user));
+        List<Availability> availabilities = user.getAgenda().getAvailabilities();
+        if (availabilities.size() == 1) {
+            ServSimplesApplication.logi(TAG, "Availability info:" + getAvailabilityInfoToString(availabilities.get(0)));
+        }
         UserManager tranUserMgr = UserManager.create(user);
         UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
 
@@ -168,11 +169,14 @@ public class MainController {
         ServSimplesApplication.logi(TAG, "getUSer:" + getUserInfoString(user));
         UserManager tranUserMgr = UserManager.create(user);
         UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
+        ServSimplesApplication.logi(TAG, "restored user:" + getUserInfoString(restUserMgr.user())); // TODO remover
         if (restUserMgr.isNull()) {
+            ServSimplesApplication.logi(TAG, "user is null");
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
         int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
+        ServSimplesApplication.logi(TAG, "validation code: " + String.valueOf(tokenValidationCode));
         return mAuthManager.handleTokenValidation(restUserMgr::user, tokenValidationCode);
     }
 

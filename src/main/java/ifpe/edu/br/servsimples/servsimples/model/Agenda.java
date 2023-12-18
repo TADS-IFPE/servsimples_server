@@ -28,8 +28,6 @@ public class Agenda {
     @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "agenda_availabilities")
     private List<Availability> availabilities = new ArrayList<>();
-    @OneToOne(mappedBy = "agenda", cascade = CascadeType.ALL, orphanRemoval = true)
-    private User user;
 
     public Agenda() {
     }

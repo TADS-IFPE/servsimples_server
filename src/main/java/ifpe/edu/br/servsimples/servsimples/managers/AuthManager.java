@@ -6,6 +6,7 @@
 package ifpe.edu.br.servsimples.servsimples.managers;
 
 import ifpe.edu.br.servsimples.servsimples.InterfacesWrapper;
+import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
 import ifpe.edu.br.servsimples.servsimples.autentication.Token;
 import ifpe.edu.br.servsimples.servsimples.controller.MainController;
 import ifpe.edu.br.servsimples.servsimples.model.User;
@@ -61,6 +62,7 @@ public class AuthManager extends Manager {
         ResponseEntity<String> response = null;
         switch (tokenValidationCode) {
             case AuthManager.TOKEN_VALID -> {
+                ServSimplesApplication.logi(TAG, "token validation OK");
                 Object result = func.onSuccess();
                 response = getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.OK, result);
             }
