@@ -12,6 +12,7 @@ import ifpe.edu.br.servsimples.servsimples.model.Appointment;
 import ifpe.edu.br.servsimples.servsimples.model.Availability;
 import ifpe.edu.br.servsimples.servsimples.model.Notification;
 import ifpe.edu.br.servsimples.servsimples.model.User;
+import ifpe.edu.br.servsimples.servsimples.repo.Repository;
 import ifpe.edu.br.servsimples.servsimples.repo.ServiceRepo;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
 import ifpe.edu.br.servsimples.servsimples.utils.AppointmentWrapper;
@@ -24,14 +25,18 @@ import java.util.List;
 
 @SpringBootTest
 class UserControllerTest {
+    @Deprecated
     private final UserRepo userRepo;
     private final MainController userController;
     private final ObjectMapper objectMapper;
+    private final Repository mRepository;
+
 
     @Autowired
     public UserControllerTest(UserRepo userRepo, ServiceRepo serviceRepo, ObjectMapper objectMapper) {
         this.userRepo = userRepo;
         this.objectMapper = objectMapper;
+        mRepository = Repository.create(userRepo, serviceRepo);
         userController = new MainController(userRepo, serviceRepo);
     }
 
@@ -147,10 +152,252 @@ class UserControllerTest {
         professionalAvailability.setEndTime(LOCAL_PROFESSIONAL_AVAILABILITY_END);
         professionalFromServerResponse.getAgenda().getAvailabilities().add(professionalAvailability);
         Integer responseCode = getIntegerFromResponseEntity(userController.registerAvailability(professionalFromServerResponse));
-        assert responseCode == AvailabilityManager.AVAILABILITY_VALID;
 
+        // Verify availability
+        assert responseCode == AvailabilityManager.AVAILABILITY_VALID;
         User byCpf = userRepo.findByCpf(professionalFromServerResponse.getCpf());
+        assert byCpf != null;
+        assert byCpf.getAgenda().getAvailabilities().size() == 1;
+        Availability availability = byCpf.getAgenda().getAvailabilities().get(0);
+        assert availability != null;
+        assert availability.getAppointment() == null;
+        assert availability.getState() == LOCAL_PROFESSIONAL_AVAILABILITY_STATE;
+        assert availability.getStartTime() == LOCAL_PROFESSIONAL_AVAILABILITY_START;
+        assert availability.getEndTime() == LOCAL_PROFESSIONAL_AVAILABILITY_END;
         userRepo.delete(byCpf);
+    }
+
+    @Test
+    public void unregisterAvailabilityWithNoSubscribersTest() {
+        final String LOCAL_PROFESSIONAL_CPF = "0999288938398";
+        final User.UserType LOCAL_PROFESSIONAL_TYPE = User.UserType.PROFESSIONAL;
+        final String LOCAL_PROFESSIONAL_NAME = "professional name";
+        final String LOCAL_PROFESSIONAL_USERNAME = "professional user name";
+        final String LOCAL_PROFESSIONAL_BIO = "professional user bio";
+        final String LOCAL_PROFESSIONAL_PASSWORD = "professional user password";
+
+        final long LOCAL_PROFESSIONAL_AVAILABILITY_START = 1702796400000L;
+        final long LOCAL_PROFESSIONAL_AVAILABILITY_END = 1702839600000L;
+        final int LOCAL_PROFESSIONAL_AVAILABILITY_STATE = Availability.AVAILABLE;
+
+        // Register user
+        User localProfessional = new User();
+        localProfessional.setCpf(LOCAL_PROFESSIONAL_CPF);
+        localProfessional.setUserType(LOCAL_PROFESSIONAL_TYPE);
+        localProfessional.setName(LOCAL_PROFESSIONAL_NAME);
+        localProfessional.setUserName(LOCAL_PROFESSIONAL_USERNAME);
+        localProfessional.setBio(LOCAL_PROFESSIONAL_BIO);
+        localProfessional.setPassword(LOCAL_PROFESSIONAL_PASSWORD);
+
+        User professionalFromServerResponse = getUserFromResponseEntity(userController.registerUser(localProfessional));
+        assert professionalFromServerResponse != null;
+        assert professionalFromServerResponse.getCpf().equals(LOCAL_PROFESSIONAL_CPF);
+        assert professionalFromServerResponse.getUserType().equals(LOCAL_PROFESSIONAL_TYPE);
+        assert professionalFromServerResponse.getName().equals(LOCAL_PROFESSIONAL_NAME);
+        assert professionalFromServerResponse.getUserName().equals(LOCAL_PROFESSIONAL_USERNAME);
+        assert professionalFromServerResponse.getBio().equals(LOCAL_PROFESSIONAL_BIO);
+        assert professionalFromServerResponse.getPassword().equals(LOCAL_PROFESSIONAL_PASSWORD);
+        assert professionalFromServerResponse.getTokenString() != null;
+
+        // Register availability
+        Availability professionalAvailability = new Availability();
+        professionalAvailability.setState(LOCAL_PROFESSIONAL_AVAILABILITY_STATE);
+        professionalAvailability.setStartTime(LOCAL_PROFESSIONAL_AVAILABILITY_START);
+        professionalAvailability.setEndTime(LOCAL_PROFESSIONAL_AVAILABILITY_END);
+        professionalFromServerResponse.getAgenda().getAvailabilities().add(professionalAvailability);
+        Integer responseCode = getIntegerFromResponseEntity(userController.registerAvailability(professionalFromServerResponse));
+
+        // Verify availability
+        assert responseCode == AvailabilityManager.AVAILABILITY_VALID;
+        User byCpf = userRepo.findByCpf(professionalFromServerResponse.getCpf());
+        assert byCpf != null;
+        assert byCpf.getAgenda().getAvailabilities().size() == 1;
+        Availability availability = byCpf.getAgenda().getAvailabilities().get(0);
+        assert availability != null;
+        assert availability.getAppointment() == null;
+        assert availability.getState() == LOCAL_PROFESSIONAL_AVAILABILITY_STATE;
+        assert availability.getStartTime() == LOCAL_PROFESSIONAL_AVAILABILITY_START;
+        assert availability.getEndTime() == LOCAL_PROFESSIONAL_AVAILABILITY_END;
+
+        Integer unregisterResponseCode = getIntegerFromResponseEntity(userController.unregisterAvailability(professionalFromServerResponse));
+        assert unregisterResponseCode == 0;
+        byCpf = userRepo.findByCpf(professionalFromServerResponse.getCpf());
+        assert byCpf.getAgenda().getAvailabilities().isEmpty();
+        userRepo.delete(byCpf);
+    }
+
+    @Test
+    public void unregisterAvailabilityWithOneSubscriberTest() {
+        // PROFESSIONAL INFO
+        final String LOCAL_PROFESSIONAL_CPF = "0999288938398";
+        final User.UserType LOCAL_PROFESSIONAL_TYPE = User.UserType.PROFESSIONAL;
+        final String LOCAL_PROFESSIONAL_NAME = "professional name";
+        final String LOCAL_PROFESSIONAL_USERNAME = "professional user name";
+        final String LOCAL_PROFESSIONAL_BIO = "professional user bio";
+        final String LOCAL_PROFESSIONAL_PASSWORD = "professional user password";
+
+        // REGISTER PROFESSIONAL
+        User localProfessional = new User();
+        localProfessional.setCpf(LOCAL_PROFESSIONAL_CPF);
+        localProfessional.setUserType(LOCAL_PROFESSIONAL_TYPE);
+        localProfessional.setName(LOCAL_PROFESSIONAL_NAME);
+        localProfessional.setUserName(LOCAL_PROFESSIONAL_USERNAME);
+        localProfessional.setBio(LOCAL_PROFESSIONAL_BIO);
+        localProfessional.setPassword(LOCAL_PROFESSIONAL_PASSWORD);
+
+        // CHECK PROFESSIONAL INFO
+        User professionalFromServerResponse = getUserFromResponseEntity(userController.registerUser(localProfessional));
+        assert professionalFromServerResponse != null;
+        assert professionalFromServerResponse.getCpf().equals(LOCAL_PROFESSIONAL_CPF);
+        assert professionalFromServerResponse.getUserType().equals(LOCAL_PROFESSIONAL_TYPE);
+        assert professionalFromServerResponse.getName().equals(LOCAL_PROFESSIONAL_NAME);
+        assert professionalFromServerResponse.getUserName().equals(LOCAL_PROFESSIONAL_USERNAME);
+        assert professionalFromServerResponse.getBio().equals(LOCAL_PROFESSIONAL_BIO);
+        assert professionalFromServerResponse.getPassword().equals(LOCAL_PROFESSIONAL_PASSWORD);
+        assert professionalFromServerResponse.getTokenString() != null;
+
+        // PROFESSIONAL AVAILABILITY INFO
+        final long LOCAL_PROFESSIONAL_AVAILABILITY_START = 1702796400000L;
+        final long LOCAL_PROFESSIONAL_AVAILABILITY_END = 1702839600000L;
+        final int LOCAL_PROFESSIONAL_AVAILABILITY_STATE = Availability.AVAILABLE;
+
+        // REGISTER PROFESSIONAL AVAILABILITY
+        Availability professionalAvailability = new Availability();
+        professionalAvailability.setState(LOCAL_PROFESSIONAL_AVAILABILITY_STATE);
+        professionalAvailability.setStartTime(LOCAL_PROFESSIONAL_AVAILABILITY_START);
+        professionalAvailability.setEndTime(LOCAL_PROFESSIONAL_AVAILABILITY_END);
+        professionalFromServerResponse.getAgenda().getAvailabilities().add(professionalAvailability);
+        Integer responseCode = getIntegerFromResponseEntity(userController.registerAvailability(professionalFromServerResponse));
+
+        // CHECK AVAILABILITY INFO
+        assert responseCode == AvailabilityManager.AVAILABILITY_VALID;
+        User byCpf = userRepo.findByCpf(professionalFromServerResponse.getCpf());
+        assert byCpf != null;
+        assert byCpf.getAgenda().getAvailabilities().size() == 1;
+        Availability availability = byCpf.getAgenda().getAvailabilities().get(0);
+        assert availability != null;
+        assert availability.getAppointment() == null;
+        assert availability.getState() == LOCAL_PROFESSIONAL_AVAILABILITY_STATE;
+        assert availability.getStartTime() == LOCAL_PROFESSIONAL_AVAILABILITY_START;
+        assert availability.getEndTime() == LOCAL_PROFESSIONAL_AVAILABILITY_END;
+
+        // CLIENT INFO
+        final String LOCAL_CLIENT_CPF = "94950949434943";
+        final User.UserType LOCAL_CLIENT_TYPE = User.UserType.USER;
+        final String LOCAL_CLIENT_NAME = "client name";
+        final String LOCAL_CLIENT_USERNAME = "client user name";
+        final String LOCAL_CLIENT_BIO = "client user bio";
+        final String LOCAL_CLIENT_PASSWORD = "client user password";
+
+        // REGISTER CLIENT
+        User localClient = new User();
+        localClient.setCpf(LOCAL_CLIENT_CPF);
+        localClient.setUserType(LOCAL_CLIENT_TYPE);
+        localClient.setName(LOCAL_CLIENT_NAME);
+        localClient.setUserName(LOCAL_CLIENT_USERNAME);
+        localClient.setBio(LOCAL_CLIENT_BIO);
+        localClient.setPassword(LOCAL_CLIENT_PASSWORD);
+
+        // CHECK CLIENT INFO
+        User clientFromServerResponse = getUserFromResponseEntity(userController.registerUser(localClient));
+        assert clientFromServerResponse != null;
+        assert clientFromServerResponse.getCpf().equals(LOCAL_CLIENT_CPF);
+        assert clientFromServerResponse.getUserType().equals(LOCAL_CLIENT_TYPE);
+        assert clientFromServerResponse.getName().equals(LOCAL_CLIENT_NAME);
+        assert clientFromServerResponse.getUserName().equals(LOCAL_CLIENT_USERNAME);
+        assert clientFromServerResponse.getBio().equals(LOCAL_CLIENT_BIO);
+        assert clientFromServerResponse.getPassword().equals(LOCAL_CLIENT_PASSWORD);
+        assert clientFromServerResponse.getTokenString() != null;
+
+        // CLIENT APPOINTMENT INFO
+        final long LOCAL_CLIENT_APPOINTMENT_START = LOCAL_PROFESSIONAL_AVAILABILITY_START;
+        final long LOCAL_CLIENT_APPOINTMENT_END = LOCAL_PROFESSIONAL_AVAILABILITY_END;
+
+        // CREATE APPOINTMENT
+        Appointment appointment = new Appointment();
+        appointment.setStartTime(LOCAL_CLIENT_APPOINTMENT_START);
+        appointment.setEndTime(LOCAL_CLIENT_APPOINTMENT_END);
+
+        // CREATE CLIENT AVAILABILITY
+        Availability clientAvailability = new Availability();
+        clientAvailability.setAppointment(appointment);
+        clientAvailability.setStartTime(appointment.getStartTime());
+        clientAvailability.setEndTime(appointment.getEndTime());
+
+        // REGISTER APPOINTMENT
+        clientFromServerResponse.getAgenda().getAvailabilities().add(clientAvailability);
+        User professionalForRequest = new User();
+        professionalForRequest.setCpf(LOCAL_PROFESSIONAL_CPF);
+        AppointmentWrapper appointmentWrapper = new AppointmentWrapper();
+        appointmentWrapper.setClient(clientFromServerResponse);
+        appointmentWrapper.setProfessional(professionalForRequest);
+        boolean booleanFromResponseEntity = getBooleanFromResponseEntity(userController.registerAppointment(appointmentWrapper));
+        assert booleanFromResponseEntity;
+
+        User clientByCpf = userRepo.findByCpf(LOCAL_CLIENT_CPF);
+        User profByCpf = userRepo.findByCpf(LOCAL_PROFESSIONAL_CPF);
+        assert profByCpf != null;
+
+        List<Availability> clientAvailabilities = clientByCpf.getAgenda().getAvailabilities();
+        assert clientAvailabilities.size() == 1;
+        Availability availability3 = clientAvailabilities.get(0);
+        if (availability3.getStartTime() == LOCAL_CLIENT_APPOINTMENT_START &&
+                availability3.getEndTime() == LOCAL_CLIENT_APPOINTMENT_END) {
+            assert availability3.getState() == Availability.ON_HOLD;
+            Appointment clientAppointment = availability3.getAppointment();
+            assert clientAppointment != null;
+            assert clientAppointment.getSubscriberId() == profByCpf.getId();
+            assert availability3.getStartTime() == clientAppointment.getStartTime();
+            assert availability3.getEndTime() == clientAppointment.getEndTime();
+        } else {
+            assert false;
+        }
+
+        List<Availability> professionalAv = profByCpf.getAgenda().getAvailabilities();
+        assert professionalAv.size() == 1;
+        Availability av = professionalAv.get(0);
+        if (av.getStartTime() == LOCAL_CLIENT_APPOINTMENT_START &&
+                av.getEndTime() == LOCAL_CLIENT_APPOINTMENT_END) {
+            assert av.getState() == Availability.ON_HOLD;
+            Appointment profAppointment = av.getAppointment();
+            assert profAppointment != null;
+            assert profAppointment.getSubscriberId() == clientByCpf.getId();
+            assert av.getStartTime() == profAppointment.getStartTime();
+            assert av.getEndTime() == profAppointment.getEndTime();
+        } else {
+            assert false;
+        }
+
+        List<Notification> professionalNotifications = profByCpf.getNotifications();
+        assert professionalNotifications != null;
+        assert professionalNotifications.size() == 1;
+
+        Notification notification = professionalNotifications.get(0);
+        assert notification.getClientId() == clientByCpf.getId();
+        assert notification.getTimestamp() != 0;
+        assert !notification.getMessage().isEmpty();
+
+        List<Notification> userNotifications = clientByCpf.getNotifications();
+        assert userNotifications != null;
+        assert userNotifications.isEmpty();
+
+        User byCpf1 = userRepo.findByCpf(professionalFromServerResponse.getCpf());
+        byCpf1.setToken(professionalFromServerResponse.getTokenString());
+        Integer unregisterResponseCode = getIntegerFromResponseEntity(userController.unregisterAvailability(byCpf1));
+        assert unregisterResponseCode == 0;
+        User prof = userRepo.findByCpf(professionalFromServerResponse.getCpf());
+        User client = userRepo.findByCpf(clientByCpf.getCpf());
+
+        // CHECK UNREGISTER INFO
+        assert prof != null;
+        assert client != null;
+        assert prof.getAgenda().getAvailabilities().isEmpty();
+        assert client.getAgenda().getAvailabilities().isEmpty();
+        assert client.getNotifications().size() == 1;
+        assert prof.getNotifications().size() == 1;
+
+        userRepo.delete(prof);
+        userRepo.delete(client);
     }
 
     @Test
@@ -210,8 +457,8 @@ class UserControllerTest {
         assert clientFromServerResponse.getTokenString() != null;
 
         // AVAILABILITY INFO
-        final long LOCAL_PROFESSIONAL_AVAILABILITY_START = 1702796400000L;
-        final long LOCAL_PROFESSIONAL_AVAILABILITY_END = 1702839600000L;
+        final long LOCAL_PROFESSIONAL_AVAILABILITY_START = 1703664000000L;
+        final long LOCAL_PROFESSIONAL_AVAILABILITY_END = 1703707200000L;
         final int LOCAL_PROFESSIONAL_AVAILABILITY_STATE = Availability.AVAILABLE;
 
         // Register availability
@@ -222,8 +469,16 @@ class UserControllerTest {
         professionalFromServerResponse.getAgenda().getAvailabilities().add(professionalAvailability);
         Integer responseCode = getIntegerFromResponseEntity(userController.registerAvailability(professionalFromServerResponse));
         assert responseCode == AvailabilityManager.AVAILABILITY_VALID;
+        User professionalFromDb = userRepo.findByCpf(professionalFromServerResponse.getCpf());
+        assert professionalFromDb != null;
+        assert professionalFromDb.getAgenda().getAvailabilities().size() == 1;
+        Availability availability1 = professionalFromDb.getAgenda().getAvailabilities().get(0);
+        assert availability1.getAppointment() == null;
+        assert availability1.getState() == LOCAL_PROFESSIONAL_AVAILABILITY_STATE;
+        assert availability1.getStartTime() == LOCAL_PROFESSIONAL_AVAILABILITY_START;
+        assert availability1.getEndTime() == LOCAL_PROFESSIONAL_AVAILABILITY_END;
 
-        // APPOINTMENT INFO
+        // Appointment info
         final long LOCAL_CLIENT_APPOINTMENT_START = LOCAL_PROFESSIONAL_AVAILABILITY_START;
         final long LOCAL_CLIENT_APPOINTMENT_END = LOCAL_PROFESSIONAL_AVAILABILITY_END;
 
@@ -231,24 +486,20 @@ class UserControllerTest {
         appointment.setStartTime(LOCAL_CLIENT_APPOINTMENT_START);
         appointment.setEndTime(LOCAL_CLIENT_APPOINTMENT_END);
 
+        // Register appointment
         Availability clientAvailability = new Availability();
         clientAvailability.setAppointment(appointment);
-
         clientFromServerResponse.getAgenda().getAvailabilities().add(clientAvailability);
-
         User professionalForRequest = new User();
         professionalForRequest.setCpf(LOCAL_PROFESSIONAL_CPF);
-
         AppointmentWrapper appointmentWrapper = new AppointmentWrapper();
         appointmentWrapper.setClient(clientFromServerResponse);
         appointmentWrapper.setProfessional(professionalForRequest);
-
         boolean booleanFromResponseEntity = getBooleanFromResponseEntity(userController.registerAppointment(appointmentWrapper));
         assert booleanFromResponseEntity;
 
         User clientByCpf = userRepo.findByCpf(LOCAL_CLIENT_CPF);
         User profByCpf = userRepo.findByCpf(LOCAL_PROFESSIONAL_CPF);
-
         assert clientByCpf != null;
         assert profByCpf != null;
 
