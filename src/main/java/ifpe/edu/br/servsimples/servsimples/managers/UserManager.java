@@ -9,6 +9,7 @@ import ifpe.edu.br.servsimples.servsimples.autentication.Token;
 import ifpe.edu.br.servsimples.servsimples.model.*;
 import jakarta.annotation.Nullable;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -74,7 +75,6 @@ public class UserManager {
     }
 
     /**
-     *
      * @return the first availability in the list
      */
     public Availability availability() {
@@ -95,7 +95,7 @@ public class UserManager {
         this.user.setToken(token.getEncryptedToken());
     }
 
-    public String cpf () {
+    public String cpf() {
         return user == null ? null : user.getCpf();
     }
 
@@ -104,7 +104,7 @@ public class UserManager {
         user.setCpf(cpf);
     }
 
-    public String name () {
+    public String name() {
         return user == null ? null : user.getName();
     }
 
@@ -113,7 +113,7 @@ public class UserManager {
         user.setName(name);
     }
 
-    public User.UserType type () {
+    public User.UserType type() {
         return user == null ? null : user.getUserType();
     }
 
@@ -121,6 +121,7 @@ public class UserManager {
         if (user == null) return;
         user.setUserType(type);
     }
+
     public String username() {
         return user == null ? null : user.getUserName();
     }
@@ -138,7 +139,7 @@ public class UserManager {
         return user == null ? null : user.getTokenString();
     }
 
-    public String bio () {
+    public String bio() {
         return user == null ? null : user.getBio();
     }
 
@@ -147,7 +148,7 @@ public class UserManager {
         user.setBio(bio);
     }
 
-    public String password () {
+    public String password() {
         return user == null ? null : user.getPassword();
     }
 
@@ -162,7 +163,6 @@ public class UserManager {
     }
 
     /**
-     *
      * @return the first Service in the list or null if empty or
      * if user is null
      */
@@ -172,7 +172,7 @@ public class UserManager {
 
     public void updateService(Service newService) {
         if (user == null || newService == null) return;
-        for (Service s: user.getServices()) {
+        for (Service s : user.getServices()) {
             if (Objects.equals(s.getId(), newService.getId())) {
                 s.setCost(newService.getCost());
                 s.setName(newService.getName());
@@ -193,7 +193,6 @@ public class UserManager {
     }
 
     /**
-     *
      * @return the first Appointment in the list or Null
      */
     @Nullable
@@ -209,12 +208,16 @@ public class UserManager {
     }
 
     public long id() {
-        if (user == null) return  -1;
+        if (user == null) return -1;
         return user.getId();
     }
 
     public void notification(Notification notification) {
         if (isNull()) return;
         this.user.getNotifications().add(notification);
+    }
+
+    public void sortAvailabilities() {
+        user.getAgenda().getAvailabilities().sort(Comparator.comparingLong(Availability::getStartTime));
     }
 }

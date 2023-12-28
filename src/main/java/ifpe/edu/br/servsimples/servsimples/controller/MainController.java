@@ -85,6 +85,7 @@ public class MainController {
                     mAvailabilityManager.getNewAvailabilityValidationCode(restUserMgr.agenda(), newAvailability);
             if (availabilityValidationCode == AvailabilityManager.AVAILABILITY_VALID) {
                 restUserMgr.availability(newAvailability);
+                restUserMgr.sortAvailabilities();
                 mRepository.updateUser(restUserMgr.user());
             }
             return availabilityValidationCode;
@@ -110,8 +111,14 @@ public class MainController {
                     rstProfessionalMgr
             );
             if (resultWrapper != null) {
-                mRepository.updateUser(resultWrapper.getProfessional());
-                mRepository.updateUser(resultWrapper.getClient());
+                UserManager rsultProfMgr = UserManager.create(resultWrapper.getProfessional());
+                rsultProfMgr.sortAvailabilities();
+
+                UserManager rsultClientMgr = UserManager.create(resultWrapper.getProfessional());
+                rsultClientMgr.sortAvailabilities();
+
+                mRepository.updateUser(rsultProfMgr.user());
+                mRepository.updateUser(rsultClientMgr.user());
                 return true;
             }
             ServSimplesApplication.logi(TAG, "result wrapper is null");

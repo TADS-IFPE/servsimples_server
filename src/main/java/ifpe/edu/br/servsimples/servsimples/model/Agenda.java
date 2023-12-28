@@ -9,7 +9,6 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,9 +21,7 @@ public class Agenda {
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "agenda_id")
     private Long id;
-    @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
-    @JoinColumn(name = "agenda_events", nullable = false)
-    private List<Event> events = new ArrayList<>();
+
     @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "agenda_availabilities")
     private List<Availability> availabilities = new ArrayList<>();
@@ -32,7 +29,7 @@ public class Agenda {
     public Agenda() {
     }
 
-    public void addAvailability(Availability availability){
+    public void addAvailability(Availability availability) {
         if (!availabilities.contains(availability)) {
             availabilities.add(availability);
         }

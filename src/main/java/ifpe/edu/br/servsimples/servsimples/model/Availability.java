@@ -47,5 +47,4 @@ public class Availability {
     @ManyToOne
     @JoinColumn(name = "agenda_id")
     private Agenda agenda;
-
 }
