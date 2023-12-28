@@ -58,6 +58,7 @@ public class MainController {
         long time = date.getTime();
         ServSimplesApplication.logi(TAG, "now: " + convertToHumanReadable(time));
     }
+
     @PostMapping("api/register/user/availability")
     public ResponseEntity<String> registerAvailability(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "registerAvailability: " + getUserInfoString(user));
@@ -84,12 +85,45 @@ public class MainController {
             int availabilityValidationCode =
                     mAvailabilityManager.getNewAvailabilityValidationCode(restUserMgr.agenda(), newAvailability);
             if (availabilityValidationCode == AvailabilityManager.AVAILABILITY_VALID) {
+                ServSimplesApplication.logi(TAG, "Availability is valid");
                 restUserMgr.availability(newAvailability);
                 restUserMgr.sortAvailabilities();
                 mRepository.updateUser(restUserMgr.user());
             }
             return availabilityValidationCode;
         }, tokenValidationCode);
+    }
+
+    @PostMapping("api/unregister/user/availability")
+    public ResponseEntity<String> unregisterAvailability(@RequestBody User user) {
+        ServSimplesApplication.logi(TAG, "unregisterAvailability: " + getUserInfoString(user));
+
+        UserManager tranUserMgr = UserManager.create(user);
+        UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
+
+        if (tranUserMgr.availabilities().isEmpty()) {
+            ServSimplesApplication.logi(TAG, "availability is empty");
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.AVAILABILITY_INVALID,
+                    getErrorMessageByCode(AvailabilityManager.AVAILABILITY_INVALID));
+        }
+
+        if (restUserMgr.isNull()) {
+            ServSimplesApplication.logi(TAG, "user is null");
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
+                    getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
+        }
+
+        if (restUserMgr.type() != User.UserType.PROFESSIONAL) {
+            ServSimplesApplication.logi(TAG, "user is not professional user");
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_ALLOWED,
+                    getErrorMessageByCode(UserManager.USER_NOT_ALLOWED));
+        }
+
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
+        return mAuthManager.handleTokenValidation(() -> {
+                    return mAvailabilityManager.handleRemoveAvailability(restUserMgr, tranUserMgr.availability(), mRepository);
+                },
+                tokenValidationCode);
     }
 
     @PostMapping("api/register/user/appointment")
@@ -417,6 +451,9 @@ public class MainController {
             case AuthManager.USER_ALREADY_LOGGED_IN -> "USER ALREADY LOGGED IN";
             case AuthManager.USER_INFO_NOT_MATCH -> "USER INFO NOT MATCH";
             case AuthManager.TOKEN_DECRYPT_FAILURE -> "TOKEN DECRYPT FAILURE";
+
+
+            case AvailabilityManager.AVAILABILITY_INVALID -> "AVAILABILITY INVALID";
 
             default -> "NOT MAPPED ERROR";
         };

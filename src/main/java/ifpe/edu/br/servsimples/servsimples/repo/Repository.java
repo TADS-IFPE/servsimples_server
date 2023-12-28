@@ -57,4 +57,8 @@ public class Repository {
     public User getUserByService(Service service) {
         return userRepo.findUsersByServicesContaining(service);
     }
+
+    public User getUserById(long subscriberId) {
+        return userRepo.findById(subscriberId);
+    }
 }

@@ -5,10 +5,13 @@
  */
 package ifpe.edu.br.servsimples.servsimples.managers;
 
+import ifpe.edu.br.servsimples.servsimples.InterfacesWrapper;
 import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
 import ifpe.edu.br.servsimples.servsimples.model.Agenda;
 import ifpe.edu.br.servsimples.servsimples.model.Appointment;
 import ifpe.edu.br.servsimples.servsimples.model.Availability;
+import ifpe.edu.br.servsimples.servsimples.model.User;
+import ifpe.edu.br.servsimples.servsimples.repo.Repository;
 import ifpe.edu.br.servsimples.servsimples.utils.AppointmentWrapper;
 import lombok.NonNull;
 
@@ -17,10 +20,11 @@ import java.util.List;
 
 public class AvailabilityManager {
 
-    public static final int AVAILABILITY_CONFLICT = -1;
-    public static final int AVAILABILITY_VALID = 0;
-    public static final int AVAILABILITY_END_EQUALS_BEGIN = 1;
-    public static final int AVAILABILITY_END_SMALLER_BEGIN = 2;
+    public static final int AVAILABILITY_CONFLICT = -10;
+    public static final int AVAILABILITY_VALID = 10;
+    public static final int AVAILABILITY_END_EQUALS_BEGIN = 11;
+    public static final int AVAILABILITY_END_SMALLER_BEGIN = 21;
+    public static final int AVAILABILITY_INVALID = 21;
     private final String TAG = AvailabilityManager.class.getSimpleName();
 
     /**
@@ -150,5 +154,34 @@ public class AvailabilityManager {
             availabilities.add(bottomAvailability);
         }
         return availabilities;
+    }
+
+    public int handleRemoveAvailability(UserManager restUserMgr,
+                                        Availability availability,
+                                        Repository repo) {
+        ServSimplesApplication.logi(TAG, "handleRemoveAvailability");
+        List<Availability> restoredAvailabilities = restUserMgr.availabilities();
+        for (Availability av : restoredAvailabilities) {
+            if (av.getStartTime() == availability.getStartTime() &&
+                    av.getEndTime() == availability.getEndTime() &&
+                    av.getState() == availability.getState() &&
+                    av.getAppointment() == availability.getAppointment()) {
+                ServSimplesApplication.logi(TAG, "found availability");
+                if (av.getState() == Availability.AVAILABLE) {
+                    ServSimplesApplication.logi(TAG, "availability has no appointment");
+                    restoredAvailabilities.remove(av);
+                    repo.updateUser(restUserMgr.user());
+                    return 0;
+                } else {
+//                    Appointment restoredAppointment = av.getAppointment();
+//                    long subscriberId = restoredAppointment.getSubscriberId();
+//                    User subscriber = repo.getUserById(subscriberId);
+//
+//                    NotificationManager.create(NotificationManager.APPOINTMENT_CANCELLING)
+                }
+            }
+        }
+        ServSimplesApplication.logi(TAG, String.valueOf(restoredAvailabilities.contains(availability)));
+        return restoredAvailabilities.contains(availability) ? 0 : -1;
     }
 }

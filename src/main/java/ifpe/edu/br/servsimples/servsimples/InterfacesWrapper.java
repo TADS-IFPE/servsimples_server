@@ -5,7 +5,7 @@
  */
 package ifpe.edu.br.servsimples.servsimples;
 
-import ifpe.edu.br.servsimples.servsimples.model.Service;
+import ifpe.edu.br.servsimples.servsimples.managers.UserManager;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -18,9 +18,8 @@ public abstract class InterfacesWrapper {
         Object onSuccess();
 
     }
-    public interface IServiceValidation {
-        void onSuccess(Service service);
-        void onFailure();
+    public interface IAvailabilityCallback {
+        void onSuccess(UserManager userManager);
     }
     public interface ServSimplesHTTPConstants {
         HttpStatus USER_EXISTS = HttpStatus.UNPROCESSABLE_ENTITY; // 422
@@ -37,5 +36,6 @@ public abstract class InterfacesWrapper {
         HttpStatus USER_NOT_ALLOWED = HttpStatus.UNAUTHORIZED; //401
 
         HttpStatus SERVICE_INVALID = HttpStatus.TOO_EARLY; //425
+        HttpStatus AVAILABILITY_INVALID = HttpStatus.ALREADY_REPORTED; // 208
     }
 }
