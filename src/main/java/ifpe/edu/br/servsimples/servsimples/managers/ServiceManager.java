@@ -12,7 +12,7 @@ import ifpe.edu.br.servsimples.servsimples.repo.ServiceRepo;
 
 import java.util.List;
 
-public class ServiceManager {
+public class ServiceManager extends Manager {
     public static final int SERVICE_VALID = 100;
     public static final int SERVICE_IS_NULL = 101;
     public static final int SERVICE_NAME_ERROR = 102;

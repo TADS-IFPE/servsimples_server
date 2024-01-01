@@ -19,13 +19,15 @@ public class Appointment {
     @Column(name = "appointment_id")
     private Long id;
 
-    @Column(name = "subscribers_id")
+    @Column(name = "subscriber_id")
     private long subscriberId;
+
+    @Column(name = "service_id")
+    private long serviceId;
 
     @Column(name = "start_time")
     private long startTime;
 
     @Column(name = "end_time")
     private long endTime;
-
 }

@@ -9,7 +9,7 @@ import ifpe.edu.br.servsimples.servsimples.model.Notification;
 
 import java.util.Date;
 
-public class NotificationManager {
+public class NotificationManager extends Manager {
     public static final int APPOINTMENT_INCOMING = -7485748;
     public static final int APPOINTMENT_CANCELLING = -7485749;
     private Notification notification;

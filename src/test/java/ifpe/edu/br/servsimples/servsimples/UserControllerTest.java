@@ -8,10 +8,9 @@ package ifpe.edu.br.servsimples.servsimples;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ifpe.edu.br.servsimples.servsimples.controller.MainController;
 import ifpe.edu.br.servsimples.servsimples.managers.AvailabilityManager;
-import ifpe.edu.br.servsimples.servsimples.model.Appointment;
-import ifpe.edu.br.servsimples.servsimples.model.Availability;
-import ifpe.edu.br.servsimples.servsimples.model.Notification;
-import ifpe.edu.br.servsimples.servsimples.model.User;
+import ifpe.edu.br.servsimples.servsimples.managers.ServiceManager;
+import ifpe.edu.br.servsimples.servsimples.managers.UserManager;
+import ifpe.edu.br.servsimples.servsimples.model.*;
 import ifpe.edu.br.servsimples.servsimples.repo.Repository;
 import ifpe.edu.br.servsimples.servsimples.repo.ServiceRepo;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
@@ -25,8 +24,6 @@ import java.util.List;
 
 @SpringBootTest
 class UserControllerTest {
-    @Deprecated
-    private final UserRepo userRepo;
     private final MainController userController;
     private final ObjectMapper objectMapper;
     private final Repository mRepository;
@@ -34,7 +31,6 @@ class UserControllerTest {
 
     @Autowired
     public UserControllerTest(UserRepo userRepo, ServiceRepo serviceRepo, ObjectMapper objectMapper) {
-        this.userRepo = userRepo;
         this.objectMapper = objectMapper;
         mRepository = Repository.create(userRepo, serviceRepo);
         userController = new MainController(userRepo, serviceRepo);
@@ -111,6 +107,183 @@ class UserControllerTest {
 
         User restoredUser = mRepository.getUserByCPF(LOCAL_PROFESSIONAL_CPF);
         mRepository.removeUser(restoredUser);
+    }
+
+    @Test
+    public void cancelAppointmentByClientTest() {
+        // Create and register professional
+        User mockProfessional = getProfessionalUserMock();
+        UserManager profFromServerUM = UserManager.create(getUserFromResponseEntity(userController.registerUser(mockProfessional)));
+        assertUserRegistrationInfo(mockProfessional, profFromServerUM.user());
+
+        // Create and register client
+        User mockClient = getClientUserMock();
+        UserManager clientFromServerUM = UserManager.create(getUserFromResponseEntity(userController.registerUser(mockClient)));
+        assertUserRegistrationInfo(mockClient, clientFromServerUM.user());
+
+        // Create and register availability
+        final long MOCK_AVAILABILITY_START_TIME = 1702796400000L;
+        final long MOCK_AVAILABILITY_END_TIME = 1702839600000L;
+        final int MOCK_AVAILABILITY_STATE = Availability.AVAILABLE;
+        Availability mockAvailability = getMockAvailability(MOCK_AVAILABILITY_START_TIME, MOCK_AVAILABILITY_END_TIME, MOCK_AVAILABILITY_STATE);
+        profFromServerUM.availability(mockAvailability);
+        Integer responseCode = getIntegerFromResponseEntity(userController.registerAvailability(profFromServerUM.user()));
+        assert responseCode == AvailabilityManager.AVAILABILITY_VALID;
+        List<Availability> rstAv = mRepository.getUserByCPF(profFromServerUM.cpf()).getAgenda().getAvailabilities();
+        assert rstAv.size() == 1;
+        assertAvailabilityInfo(mockAvailability, rstAv.get(0));
+
+        // Create and register a service
+        profFromServerUM.service(getMockService());
+        User resultUser = getUserFromResponseEntity(userController.registerService(profFromServerUM.user()));
+        assert resultUser != null;
+        UserManager profFromDb = UserManager.create(mRepository.getUserByCPF(profFromServerUM.cpf()));
+        assert !profFromDb.isNull();
+        assert profFromDb.services().size() == 1;
+        assertServiceEqualInfo(profFromDb.service(), getMockService());
+
+        // Create and register appointment
+        Service restoredService = profFromDb.services().get(0);
+        final long APPOINTMENT_START = MOCK_AVAILABILITY_START_TIME;
+        final long APPOINTMENT_END = MOCK_AVAILABILITY_END_TIME;
+        Appointment localClientAppointment = new Appointment();
+        localClientAppointment.setStartTime(APPOINTMENT_START);
+        localClientAppointment.setEndTime(APPOINTMENT_END);
+        localClientAppointment.setServiceId(restoredService.getId());
+        Availability clientAvailability = getMockAvailability(0, 0, 0);
+        clientAvailability.setAppointment(localClientAppointment);
+        clientAvailability.setState(Availability.ON_HOLD);
+        assert !clientFromServerUM.isNull();
+        clientFromServerUM.availability(clientAvailability);
+
+        User professionalForRequest = new User();
+        professionalForRequest.setCpf(profFromServerUM.cpf());
+        AppointmentWrapper appointmentWrapper = new AppointmentWrapper();
+        appointmentWrapper.setClient(clientFromServerUM.user());
+        appointmentWrapper.setProfessional(professionalForRequest);
+
+        assert getBooleanFromResponseEntity(userController.registerAppointment(appointmentWrapper));
+        User clientFromDB = mRepository.getUserByCPF(clientFromServerUM.cpf());
+        List<Availability> clientAvailabilities = clientFromDB.getAgenda().getAvailabilities();
+        assert clientAvailabilities.size() == 1;
+        Appointment restoredClientAppointment = clientAvailabilities.get(0).getAppointment();
+        assertAppointmentInfo(localClientAppointment, restoredClientAppointment);
+
+        User professionalFromDB = mRepository.getUserByCPF(profFromServerUM.cpf());
+        List<Availability> profAvailabilities = professionalFromDB.getAgenda().getAvailabilities();
+        assert profAvailabilities.size() == 1;
+        Appointment restoredProfAppointment = profAvailabilities.get(0).getAppointment();
+        assertAppointmentInfo(localClientAppointment, restoredProfAppointment);
+
+        assert restoredClientAppointment.getSubscriberId() == professionalFromDB.getId();
+        assert restoredProfAppointment.getSubscriberId() == clientFromDB.getId();
+
+        // Cancel appointment by user
+        assert getBooleanFromResponseEntity(userController.cancelAppointment(clientFromServerUM.user()));
+        clientFromDB = mRepository.getUserByCPF(clientFromServerUM.cpf());
+        assert clientFromDB.getAgenda().getAvailabilities().isEmpty();
+        professionalFromDB = mRepository.getUserByCPF(profFromServerUM.cpf());
+        assert professionalFromDB.getAgenda().getAvailabilities().size() == 1;
+        assertAvailabilityInfo(mockAvailability, professionalFromDB.getAgenda().getAvailabilities().get(0));
+
+        // CLEAR DB ==============================================================================
+        User professionalByCPF = mRepository.getUserByCPF(profFromServerUM.cpf());
+        User clientByCPF = mRepository.getUserByCPF(clientFromServerUM.cpf());
+
+        mRepository.removeUser(professionalByCPF);
+        mRepository.removeUser(clientByCPF);
+    }
+
+    @Test
+    public void cancelAppointmentByProfessionalTest() {
+        // Create and register professional
+        User mockProfessional = getProfessionalUserMock();
+        UserManager profFromServerUM = UserManager.create(getUserFromResponseEntity(userController.registerUser(mockProfessional)));
+        assertUserRegistrationInfo(mockProfessional, profFromServerUM.user());
+
+        // Create and register client
+        User mockClient = getClientUserMock();
+        UserManager clientFromServerUM = UserManager.create(getUserFromResponseEntity(userController.registerUser(mockClient)));
+        assertUserRegistrationInfo(mockClient, clientFromServerUM.user());
+
+        // Create and register availability
+        final long MOCK_AVAILABILITY_START_TIME = 1702796400000L;
+        final long MOCK_AVAILABILITY_END_TIME = 1702839600000L;
+        final int MOCK_AVAILABILITY_STATE = Availability.AVAILABLE;
+        Availability mockAvailability = getMockAvailability(MOCK_AVAILABILITY_START_TIME, MOCK_AVAILABILITY_END_TIME, MOCK_AVAILABILITY_STATE);
+        profFromServerUM.availability(mockAvailability);
+        Integer responseCode = getIntegerFromResponseEntity(userController.registerAvailability(profFromServerUM.user()));
+        assert responseCode == AvailabilityManager.AVAILABILITY_VALID;
+        List<Availability> rstAv = mRepository.getUserByCPF(profFromServerUM.cpf()).getAgenda().getAvailabilities();
+        assert rstAv.size() == 1;
+        assertAvailabilityInfo(mockAvailability, rstAv.get(0));
+
+        // Create and register appointment
+        final long APPOINTMENT_START = MOCK_AVAILABILITY_START_TIME;
+        final long APPOINTMENT_END = MOCK_AVAILABILITY_END_TIME;
+        Appointment appointment = new Appointment();
+        appointment.setStartTime(APPOINTMENT_START);
+        appointment.setEndTime(APPOINTMENT_END);
+        Availability clientAvailability = getMockAvailability(0, 0, 0);
+        clientAvailability.setAppointment(appointment);
+        clientAvailability.setState(Availability.ON_HOLD);
+        clientFromServerUM.availability(clientAvailability);
+
+        User professionalForRequest = new User();
+        professionalForRequest.setCpf(profFromServerUM.cpf());
+        AppointmentWrapper appointmentWrapper = new AppointmentWrapper();
+        appointmentWrapper.setClient(clientFromServerUM.user());
+        appointmentWrapper.setProfessional(professionalForRequest);
+
+        assert getBooleanFromResponseEntity(userController.registerAppointment(appointmentWrapper));
+        User clientFromDB = mRepository.getUserByCPF(clientFromServerUM.cpf());
+        List<Availability> clientAvailabilities = clientFromDB.getAgenda().getAvailabilities();
+        assert clientAvailabilities.size() == 1;
+        User professionalFromDB = mRepository.getUserByCPF(profFromServerUM.cpf());
+        List<Availability> profAvailabilities = professionalFromDB.getAgenda().getAvailabilities();
+        assert profAvailabilities.size() == 1;
+        assertAppointmentInfo(appointment, clientAvailabilities.get(0).getAppointment());
+        assertAppointmentInfo(appointment, profAvailabilities.get(0).getAppointment());
+
+        // Update avaiability on request client
+        profFromServerUM.availabilities().remove(0);
+        profFromServerUM.availability(profAvailabilities.get(0));
+
+        // Cancel appointment by professional
+        assert getBooleanFromResponseEntity(userController.cancelAppointment(profFromServerUM.user()));
+        clientFromDB = mRepository.getUserByCPF(clientFromServerUM.cpf());
+        assert clientFromDB.getAgenda().getAvailabilities().isEmpty();
+        professionalFromDB = mRepository.getUserByCPF(profFromServerUM.cpf());
+        assert professionalFromDB.getAgenda().getAvailabilities().size() == 1;
+
+        // CLEAR DB ==============================================================================
+        User professionalByCPF = mRepository.getUserByCPF(profFromServerUM.cpf());
+        User clientByCPF = mRepository.getUserByCPF(clientFromServerUM.cpf());
+
+        mRepository.removeUser(professionalByCPF);
+        mRepository.removeUser(clientByCPF);
+    }
+
+    private void assertServiceEqualInfo(Service a, Service b) {
+        assert a.getName().equals(b.getName());
+        assert a.getCategory().equals(b.getCategory());
+        assert a.getDescription().equals(b.getDescription());
+        Cost costA = a.getCost();
+        Cost costB = b.getCost();
+        assert costA.getTime().equals(costB.getTime());
+        assert costA.getValue().equals(costB.getValue());
+    }
+
+    private Service getMockService() {
+        Service service = new Service();
+        service.setCategory("Lazer");
+        service.setName("test service");
+        service.setDescription("teste service description");
+        Cost cost = new Cost();
+        cost.setTime("hour");
+        cost.setValue("R$200,00");
+        service.setCost(cost);
+        return service;
     }
 
     @Test
@@ -1158,5 +1331,84 @@ class UserControllerTest {
             }
         }
         return null;
+    }
+
+    private Availability getMockAvailability(long startTime, long endTime, int state) {
+        Availability av = new Availability();
+        av.setState(state);
+        av.setStartTime(startTime);
+        av.setEndTime(endTime);
+        return av;
+    }
+
+    private void assertAvailabilityInfo(Availability mockAvailability, Availability restoredAvailability) {
+        assert mockAvailability != null;
+        assert restoredAvailability != null;
+        assert restoredAvailability.getAppointment() == null;
+        assert mockAvailability.getAppointment() == null;
+        assert restoredAvailability.getState() == mockAvailability.getState();
+        assert restoredAvailability.getStartTime() == mockAvailability.getStartTime();
+        assert restoredAvailability.getEndTime() == mockAvailability.getEndTime();
+    }
+
+    private void assertAppointmentInfo(Appointment a, Appointment b) {
+        ServSimplesApplication.logi("WILL", "b.getStartTime():" + b.getStartTime());
+        ServSimplesApplication.logi("WILL", "b.getEndTime():" + b.getEndTime());
+        ServSimplesApplication.logi("WILL", "b.getServiceId():" + b.getServiceId());
+        ServSimplesApplication.logi("WILL", "a.getServiceId():" + a.getServiceId());
+        assert a.getEndTime() == b.getEndTime();
+        assert a.getStartTime() == b.getStartTime();
+        assert a.getServiceId() == b.getServiceId();
+    }
+
+    private void assertUserRegistrationInfo(User mockUser, User restoredUser) {
+        UserManager mockUserManager = UserManager.create(mockUser);
+        UserManager restoredUserManager = UserManager.create(restoredUser);
+        assert !mockUserManager.isNull();
+        assert !restoredUserManager.isNull();
+
+        assert restoredUserManager.cpf().equals(mockUserManager.cpf());
+        assert restoredUserManager.type().equals(mockUserManager.type());
+        assert restoredUserManager.name().equals(mockUserManager.name());
+        assert restoredUserManager.username().equals(mockUserManager.username());
+        assert restoredUserManager.bio().equals(mockUserManager.bio());
+        assert restoredUserManager.password().equals(mockUserManager.password());
+        assert restoredUserManager.tokenString() != null;
+    }
+
+    private User getClientUserMock() {
+        final String LOCAL_CLIENT_CPF = "94950949434943";
+        final User.UserType LOCAL_CLIENT_TYPE = User.UserType.USER;
+        final String LOCAL_CLIENT_NAME = "client name";
+        final String LOCAL_CLIENT_USERNAME = "client user name";
+        final String LOCAL_CLIENT_BIO = "client user bio";
+        final String LOCAL_CLIENT_PASSWORD = "client user password";
+
+        User user = new User();
+        user.setCpf(LOCAL_CLIENT_CPF);
+        user.setUserType(LOCAL_CLIENT_TYPE);
+        user.setName(LOCAL_CLIENT_NAME);
+        user.setUserName(LOCAL_CLIENT_USERNAME);
+        user.setBio(LOCAL_CLIENT_BIO);
+        user.setPassword(LOCAL_CLIENT_PASSWORD);
+        return user;
+    }
+
+    private User getProfessionalUserMock() {
+        final String LOCAL_PROFESSIONAL_CPF = "0999288938398";
+        final User.UserType LOCAL_PROFESSIONAL_TYPE = User.UserType.PROFESSIONAL;
+        final String LOCAL_PROFESSIONAL_NAME = "professional name";
+        final String LOCAL_PROFESSIONAL_USERNAME = "professional user name";
+        final String LOCAL_PROFESSIONAL_BIO = "professional user bio";
+        final String LOCAL_PROFESSIONAL_PASSWORD = "professional user password";
+
+        User user = new User();
+        user.setCpf(LOCAL_PROFESSIONAL_CPF);
+        user.setUserType(LOCAL_PROFESSIONAL_TYPE);
+        user.setName(LOCAL_PROFESSIONAL_NAME);
+        user.setUserName(LOCAL_PROFESSIONAL_USERNAME);
+        user.setBio(LOCAL_PROFESSIONAL_BIO);
+        user.setPassword(LOCAL_PROFESSIONAL_PASSWORD);
+        return user;
     }
 }

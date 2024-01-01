@@ -5,7 +5,6 @@
  */
 package ifpe.edu.br.servsimples.servsimples.managers;
 
-import ifpe.edu.br.servsimples.servsimples.InterfacesWrapper;
 import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
 import ifpe.edu.br.servsimples.servsimples.model.Agenda;
 import ifpe.edu.br.servsimples.servsimples.model.Appointment;
@@ -18,7 +17,7 @@ import lombok.NonNull;
 import java.util.ArrayList;
 import java.util.List;
 
-public class AvailabilityManager {
+public class AvailabilityManager extends Manager {
 
     public static final int AVAILABILITY_CONFLICT = -10;
     public static final int AVAILABILITY_VALID = 10;
@@ -66,10 +65,10 @@ public class AvailabilityManager {
     }
 
 
-    public AppointmentWrapper performAppointmentRegistration(@NonNull Appointment appointment,
+    public AppointmentWrapper performAppointmentRegistration(@NonNull Appointment incomingAppointment,
                                                              @NonNull UserManager rstClientMgr,
                                                              @NonNull UserManager rstProfessionalMgr) {
-        if (appointment == null || rstClientMgr.isNull() || rstProfessionalMgr.isNull()) return null;
+        if (incomingAppointment == null || rstClientMgr.isNull() || rstProfessionalMgr.isNull()) return null;
         List<Availability> restProfAvailabilities = rstProfessionalMgr.availabilities();
         if (restProfAvailabilities == null || restProfAvailabilities.isEmpty()) {
             ServSimplesApplication.logi(TAG, "Professional user has no availability");
@@ -77,11 +76,11 @@ public class AvailabilityManager {
         }
         for (Availability iterationAvailability : restProfAvailabilities) {
             if (iterationAvailability.getState() == Availability.AVAILABLE) {
-                if (availabilityMatch(iterationAvailability, appointment)) {
+                if (availabilityMatch(iterationAvailability, incomingAppointment)) {
                     ServSimplesApplication.logi(TAG, "found professional availability time slot");
-                    appointment.setSubscriberId(rstClientMgr.id());
+                    incomingAppointment.setSubscriberId(rstClientMgr.id());
 
-                    List<Availability> resultSet = handleAppointmentRegistration(iterationAvailability, appointment);
+                    List<Availability> resultSet = handleAppointmentRegistration(iterationAvailability, incomingAppointment);
                     if (resultSet == null || resultSet.isEmpty()) return null;
                     rstProfessionalMgr.availabilities().remove(iterationAvailability);
                     NotificationManager notManager = NotificationManager.create(NotificationManager.APPOINTMENT_INCOMING);
@@ -92,14 +91,15 @@ public class AvailabilityManager {
                     }
 
                     Appointment clientAppointment = new Appointment();
-                    clientAppointment.setStartTime(appointment.getStartTime());
-                    clientAppointment.setEndTime(appointment.getEndTime());
+                    clientAppointment.setStartTime(incomingAppointment.getStartTime());
+                    clientAppointment.setEndTime(incomingAppointment.getEndTime());
                     clientAppointment.setSubscriberId(rstProfessionalMgr.id());
+                    clientAppointment.setServiceId(incomingAppointment.getServiceId());
 
                     Availability clientAvailability = new Availability();
                     clientAvailability.setState(Availability.ON_HOLD);
-                    clientAvailability.setStartTime(appointment.getStartTime());
-                    clientAvailability.setEndTime(appointment.getEndTime());
+                    clientAvailability.setStartTime(incomingAppointment.getStartTime());
+                    clientAvailability.setEndTime(incomingAppointment.getEndTime());
                     clientAvailability.setAppointment(clientAppointment);
                     rstClientMgr.availability(clientAvailability);
                     return getAppointmentWrapper(rstClientMgr, rstProfessionalMgr);
@@ -203,5 +203,91 @@ public class AvailabilityManager {
         }
         ServSimplesApplication.logi(TAG, "no availability found");
         return -76948;
+    }
+
+    public boolean handleCancelAppointment(UserManager userMgr,
+                                           Availability availability,
+                                           Repository repository) {
+        ServSimplesApplication.logi(TAG, "handleCancelAppointment");
+        if (availability.getAppointment() == null) return false;
+        ServSimplesApplication.logi(TAG, "appointment not null");
+        List<Availability> userAvailabilities = userMgr.availabilities();
+        if (userAvailabilities.isEmpty()) return false;
+        ServSimplesApplication.logi(TAG, "user availabilities:" + userAvailabilities.size());
+        for (Availability userAvailability : userAvailabilities) {
+            if (userAvailability.getState() != Availability.AVAILABLE) {
+                ServSimplesApplication.logi(TAG, "availability state:" + userAvailability.getState());
+                Appointment userAppointment = userAvailability.getAppointment();
+                if (userAppointment == null) return false;
+                ServSimplesApplication.logi(TAG, "appointment not null");
+                if (isAppointmentsEqual(availability.getAppointment(), userAppointment)) {
+                    if (userMgr.type() == User.UserType.PROFESSIONAL) {
+                        ServSimplesApplication.logi(TAG, "use type: professional");
+                        UserManager restoredClientMgr = UserManager.create(repository.getUserById(userAppointment.getSubscriberId()));
+                        if (restoredClientMgr.isNull()) return false;
+                        ServSimplesApplication.logi(TAG, "client not null");
+                        // notificar cliente
+                        NotificationManager notificationManager = NotificationManager.create(NotificationManager.APPOINTMENT_CANCELLING);
+                        restoredClientMgr.notification(notificationManager.notification());
+
+                        List<Availability> clientAvailabilities = restoredClientMgr.availabilities();
+                        for (Availability clientAvailability : clientAvailabilities) {
+                            if (clientAvailability.getState() != Availability.AVAILABLE) {
+                                if (clientAvailability.getAppointment().getSubscriberId() == userMgr.id() &&
+                                        clientAvailability.getAppointment().getStartTime() == userAppointment.getStartTime()) {
+                                    // remover disponibilidade do cliente
+                                    clientAvailabilities.remove(clientAvailability);
+                                    restoredClientMgr.sortAvailabilities();
+                                    // atualizar cliente
+                                    repository.updateUser(restoredClientMgr.user());
+                                    userAvailability.setAppointment(null);
+                                    // remover appointment do profissional
+                                    userAvailability.setState(Availability.AVAILABLE);
+                                    // mudar estado da disponibilidade para disponivel
+                                    repository.updateUser(userMgr.user());
+                                    // atualizar profissional
+                                    return true;
+                                }
+                            }
+                        }
+                        return false;
+                    } else if (userMgr.type() == User.UserType.USER) {
+                        ServSimplesApplication.logi(TAG, "use type: client");
+                        UserManager restoredProfMgr = UserManager.create(repository.getUserById(userAppointment.getSubscriberId()));
+                        if (restoredProfMgr.isNull()) return false;
+                        // notificar profissional
+                        NotificationManager notificationManager = NotificationManager.create(NotificationManager.APPOINTMENT_CANCELLING);
+                        restoredProfMgr.notification(notificationManager.notification());
+                        List<Availability> profAvailabilities = restoredProfMgr.availabilities();
+                        if (profAvailabilities.isEmpty()) return false;
+                        for (Availability profAvailability : profAvailabilities) {
+                            if (profAvailability.getState() != Availability.AVAILABLE) {
+                                if (profAvailability.getAppointment().getSubscriberId() == userMgr.id() &&
+                                        profAvailability.getAppointment().getStartTime() == userAppointment.getStartTime()) {
+                                    // remover appointment do profissional
+                                    profAvailability.setAppointment(null);
+                                    // mudar estado da disponibilidade para disponivel
+                                    profAvailability.setState(Availability.AVAILABLE);
+                                    // atualizar profissional
+                                    repository.updateUser(restoredProfMgr.user());
+                                }
+                            }
+                        }
+                        // remover disponibilidade do cliente
+                        userAvailabilities.remove(userAvailability);
+                        // atualizar cliente
+                        repository.updateUser(userMgr.user());
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+
+    private boolean isAppointmentsEqual(Appointment a, Appointment b) {
+        return a.getStartTime() == b.getStartTime() &&
+                a.getEndTime() == b.getEndTime();
     }
 }

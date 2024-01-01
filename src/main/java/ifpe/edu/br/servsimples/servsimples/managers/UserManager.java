@@ -9,11 +9,13 @@ import ifpe.edu.br.servsimples.servsimples.autentication.Token;
 import ifpe.edu.br.servsimples.servsimples.model.*;
 import jakarta.annotation.Nullable;
 
+import javax.swing.*;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-public class UserManager {
+public class UserManager extends Manager {
 
     public static final int VALID_USER = 0;
     public static final int ERROR_NAME = 1;
@@ -219,5 +221,43 @@ public class UserManager {
 
     public void sortAvailabilities() {
         user.getAgenda().getAvailabilities().sort(Comparator.comparingLong(Availability::getStartTime));
+    }
+
+    public List<Appointment> appointments() {
+        if (isNull()) return null;
+        List<Availability> availabilities = user.getAgenda().getAvailabilities();
+        List<Appointment> appointments = new ArrayList<>();
+        for (Availability a: availabilities) {
+            if (a.getAppointment() != null) {
+                appointments.add(a.getAppointment());
+            }
+        }
+        return appointments.isEmpty() ? null : appointments;
+    }
+
+    public boolean removeAppointment(Appointment appointment) {
+        if (isNull()) return false;
+        List<Availability> availabilities = user.getAgenda().getAvailabilities();
+        for (Availability a: availabilities) {
+            if (a.getState() != Availability.AVAILABLE) {
+                if (a.getAppointment() == null) return false;
+                if (isAppointmentsEqual(a.getAppointment(), appointment)) {
+                    a.setAppointment(null);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean isAppointmentsEqual(Appointment a, Appointment b) {
+        return a.getSubscriberId() == b.getSubscriberId() &&
+                a.getStartTime() == b.getStartTime() &&
+                a.getEndTime() == b.getEndTime();
+    }
+
+    public List<Service> services() {
+        if (isNull()) return null;
+        return user.getServices();
     }
 }

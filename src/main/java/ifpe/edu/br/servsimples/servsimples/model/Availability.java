@@ -40,7 +40,7 @@ public class Availability {
     @Column(name = "availability_state", nullable = false)
     private int state;
 
-    @OneToOne(cascade = CascadeType.ALL)
+    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "availability_appointment", referencedColumnName = "appointment_id")
     private Appointment appointment;
 

@@ -59,6 +59,30 @@ public class MainController {
         ServSimplesApplication.logi(TAG, "now: " + convertToHumanReadable(time));
     }
 
+    @PostMapping("api/unregister/user/appointment")
+    public ResponseEntity<String> cancelAppointment(User user) {
+        ServSimplesApplication.logi(TAG, "cancelAppointment: " + getUserInfoString(user));
+        UserManager tranUserMgr = UserManager.create(user);
+        UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(user.getCpf()));
+
+        if (tranUserMgr.availabilities().size() != 1) {
+            ServSimplesApplication.logi(TAG, "multiple availability");
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.AVAILABILITY_INVALID,
+                    getErrorMessageByCode(AvailabilityManager.AVAILABILITY_INVALID));
+        }
+
+        if (restUserMgr.isNull()) {
+            ServSimplesApplication.logi(TAG, "user is null");
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
+                    getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
+        }
+
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
+        return mAuthManager.handleTokenValidation(() ->
+                        mAvailabilityManager.handleCancelAppointment(restUserMgr, tranUserMgr.availability(), mRepository),
+                tokenValidationCode);
+    }
+
     @PostMapping("api/register/user/availability")
     public ResponseEntity<String> registerAvailability(@RequestBody User user) {
         ServSimplesApplication.logi(TAG, "registerAvailability: " + getUserInfoString(user));
@@ -130,7 +154,7 @@ public class MainController {
         UserManager tranClientMgr = UserManager.create(appointmentWrapper.getClient());
         UserManager rstProfessionalMgr = UserManager.create(mRepository.getUserByCPF(appointmentWrapper.getProfessional().getCpf()));
         ServSimplesApplication.logi(TAG, "[registerAppointment] user info:" + getUserInfoString(tranClientMgr.user())
-                + " Professional info:" + getUserInfoString(appointmentWrapper.getProfessional()) + " Appointment info:" + getAppointmentInfoString(tranClientMgr.appointment()));
+                + " Professional info:" + getUserInfoString(appointmentWrapper.getProfessional()));
         UserManager rstClientMgr = UserManager.create(mRepository.getUserByCPF(tranClientMgr.cpf()));
         if (rstClientMgr.isNull() || rstProfessionalMgr.isNull()) {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
@@ -456,14 +480,17 @@ public class MainController {
         if (user == null) {
             return "user is null";
         }
-        String response = "";
-        response += "name:" + user.getName();
-        response += " username:" + user.getUserName();
-        response += " cpf:" + user.getCpf();
-        response += " password:" + user.getPassword();
-        response += " token:" + user.getToken();
-        response += " type:" + user.getUserType();
-        return response;
+        StringBuilder response = new StringBuilder();
+        response.append("name:").append(user.getName());
+        response.append(" username:").append(user.getUserName());
+        response.append(" cpf:").append(user.getCpf());
+        response.append(" password:").append(user.getPassword());
+        response.append(" token:").append(user.getToken());
+        response.append(" type:").append(user.getUserType());
+        for (Availability a: user.getAgenda().getAvailabilities()) {
+            response.append("availability:").append(getAvailabilityInfoToString(a)).append("\n");
+        }
+        return response.toString();
     }
 
     private String getServiceInfoFromUserString(User user) {
@@ -505,7 +532,7 @@ public class MainController {
     private String getAppointmentInfoString(Appointment appointment) {
         if (appointment == null) return " Appointment is null";
         return " Appointment: [start time:" + appointment.getStartTime() + " end time:" + appointment.getEndTime() +
-                " subscriber id:" + appointment.getSubscriberId() + "]";
+                " subscriber id:" + appointment.getSubscriberId() + " service id:" + appointment.getServiceId() +"]";
 
     }
 }
