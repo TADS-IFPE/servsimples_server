@@ -1,8 +1,11 @@
 package ifpe.edu.br.servsimples.servsimples.repo;
 
 import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
+import ifpe.edu.br.servsimples.servsimples.model.Notification;
 import ifpe.edu.br.servsimples.servsimples.model.Service;
 import ifpe.edu.br.servsimples.servsimples.model.User;
+
+import java.util.List;
 
 public class Repository {
     private String TAG = Repository.class.getSimpleName();

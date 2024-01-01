@@ -156,32 +156,52 @@ public class AvailabilityManager {
         return availabilities;
     }
 
-    public int handleRemoveAvailability(UserManager restUserMgr,
+    public int handleRemoveAvailability(UserManager professionalUserMgr,
                                         Availability availability,
                                         Repository repo) {
         ServSimplesApplication.logi(TAG, "handleRemoveAvailability");
-        List<Availability> restoredAvailabilities = restUserMgr.availabilities();
-        for (Availability av : restoredAvailabilities) {
-            if (av.getStartTime() == availability.getStartTime() &&
-                    av.getEndTime() == availability.getEndTime() &&
-                    av.getState() == availability.getState() &&
-                    av.getAppointment() == availability.getAppointment()) {
+        List<Availability> professionalAvailabilities = professionalUserMgr.availabilities();
+        if (professionalAvailabilities.isEmpty()) return -9848873;
+        for (Availability profIterationAvail : professionalAvailabilities) {
+            if (profIterationAvail.getStartTime() == availability.getStartTime() &&
+                    profIterationAvail.getEndTime() == availability.getEndTime() &&
+                    profIterationAvail.getState() == availability.getState()) {
                 ServSimplesApplication.logi(TAG, "found availability");
-                if (av.getState() == Availability.AVAILABLE) {
+                if (profIterationAvail.getState() == Availability.AVAILABLE) {
                     ServSimplesApplication.logi(TAG, "availability has no appointment");
-                    restoredAvailabilities.remove(av);
-                    repo.updateUser(restUserMgr.user());
+                    professionalAvailabilities.remove(profIterationAvail);
+                    repo.updateUser(professionalUserMgr.user());
                     return 0;
                 } else {
-//                    Appointment restoredAppointment = av.getAppointment();
-//                    long subscriberId = restoredAppointment.getSubscriberId();
-//                    User subscriber = repo.getUserById(subscriberId);
-//
-//                    NotificationManager.create(NotificationManager.APPOINTMENT_CANCELLING)
+                    ServSimplesApplication.logi(TAG, "availability has a appointment registered");
+                    UserManager clientMgr = UserManager.create(repo.getUserById(profIterationAvail.getAppointment().getSubscriberId()));
+                    if (clientMgr.isNull()) return -1;
+                    List<Availability> clientAvailabilities = clientMgr.availabilities();
+                    for (Availability clientIterationAvail : clientAvailabilities) {
+                        if (clientIterationAvail.getState() != Availability.AVAILABLE) {
+                            long professionalId = clientIterationAvail.getAppointment().getSubscriberId();
+                            if (professionalId == professionalUserMgr.id()) {
+                                ServSimplesApplication.logi(TAG, "appointment found on client");
+                                clientAvailabilities.remove(clientIterationAvail);
+                                clientMgr.sortAvailabilities();
+
+                                professionalAvailabilities.remove(profIterationAvail);
+                                professionalUserMgr.sortAvailabilities();
+
+                                // notification
+                                NotificationManager nm = NotificationManager.create(NotificationManager.APPOINTMENT_CANCELLING);
+                                nm.professionalId(professionalUserMgr.id());
+                                clientMgr.notification(nm.notification());
+                                repo.updateUser(clientMgr.user());
+                                repo.updateUser(professionalUserMgr.user());
+                                return 0;
+                            }
+                        }
+                    }
                 }
             }
         }
-        ServSimplesApplication.logi(TAG, String.valueOf(restoredAvailabilities.contains(availability)));
-        return restoredAvailabilities.contains(availability) ? 0 : -1;
+        ServSimplesApplication.logi(TAG, "no availability found");
+        return -76948;
     }
 }

@@ -21,17 +21,7 @@ public class Agenda {
     @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "agenda_id")
     private Long id;
-
     @OneToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "agenda_availabilities")
     private List<Availability> availabilities = new ArrayList<>();
-
-    public Agenda() {
-    }
-
-    public void addAvailability(Availability availability) {
-        if (!availabilities.contains(availability)) {
-            availabilities.add(availability);
-        }
-    }
 }

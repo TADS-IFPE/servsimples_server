@@ -99,10 +99,10 @@ public class MainController {
         ServSimplesApplication.logi(TAG, "unregisterAvailability: " + getUserInfoString(user));
 
         UserManager tranUserMgr = UserManager.create(user);
-        UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
+        UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(user.getCpf()));
 
-        if (tranUserMgr.availabilities().isEmpty()) {
-            ServSimplesApplication.logi(TAG, "availability is empty");
+        if (tranUserMgr.availabilities().size() != 1) {
+            ServSimplesApplication.logi(TAG, "multiple availability");
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.AVAILABILITY_INVALID,
                     getErrorMessageByCode(AvailabilityManager.AVAILABILITY_INVALID));
         }
@@ -120,9 +120,8 @@ public class MainController {
         }
 
         int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
-        return mAuthManager.handleTokenValidation(() -> {
-                    return mAvailabilityManager.handleRemoveAvailability(restUserMgr, tranUserMgr.availability(), mRepository);
-                },
+        return mAuthManager.handleTokenValidation(() ->
+                        mAvailabilityManager.handleRemoveAvailability(restUserMgr, tranUserMgr.availability(), mRepository),
                 tokenValidationCode);
     }
 
@@ -145,14 +144,8 @@ public class MainController {
                     rstProfessionalMgr
             );
             if (resultWrapper != null) {
-                UserManager rsultProfMgr = UserManager.create(resultWrapper.getProfessional());
-                rsultProfMgr.sortAvailabilities();
-
-                UserManager rsultClientMgr = UserManager.create(resultWrapper.getProfessional());
-                rsultClientMgr.sortAvailabilities();
-
-                mRepository.updateUser(rsultProfMgr.user());
-                mRepository.updateUser(rsultClientMgr.user());
+                mRepository.updateUser(resultWrapper.getProfessional());
+                mRepository.updateUser(resultWrapper.getClient());
                 return true;
             }
             ServSimplesApplication.logi(TAG, "result wrapper is null");
