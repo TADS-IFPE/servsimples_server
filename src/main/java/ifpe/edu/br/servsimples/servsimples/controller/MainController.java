@@ -285,10 +285,6 @@ public class MainController {
             return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
                     getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
         }
-        if (restUserMgr.type() != User.UserType.PROFESSIONAL) {
-            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_ALLOWED,
-                    getErrorMessageByCode(UserManager.USER_NOT_ALLOWED));
-        }
         int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
         return mAuthManager.handleTokenValidation(this::getMockCategories, tokenValidationCode);
     }
