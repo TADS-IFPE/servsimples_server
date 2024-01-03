@@ -102,6 +102,8 @@ public class AvailabilityManager extends Manager {
                     clientAvailability.setEndTime(incomingAppointment.getEndTime());
                     clientAvailability.setAppointment(clientAppointment);
                     rstClientMgr.availability(clientAvailability);
+                    rstClientMgr.sortAvailabilities();
+                    rstProfessionalMgr.sortAvailabilities();
                     return getAppointmentWrapper(rstClientMgr, rstProfessionalMgr);
                 }
             }
@@ -170,6 +172,7 @@ public class AvailabilityManager extends Manager {
                 if (profIterationAvail.getState() == Availability.AVAILABLE) {
                     ServSimplesApplication.logi(TAG, "availability has no appointment");
                     professionalAvailabilities.remove(profIterationAvail);
+                    professionalUserMgr.sortAvailabilities();
                     repo.updateUser(professionalUserMgr.user());
                     return 0;
                 } else {
@@ -183,16 +186,15 @@ public class AvailabilityManager extends Manager {
                             if (professionalId == professionalUserMgr.id()) {
                                 ServSimplesApplication.logi(TAG, "appointment found on client");
                                 clientAvailabilities.remove(clientIterationAvail);
-                                clientMgr.sortAvailabilities();
-
                                 professionalAvailabilities.remove(profIterationAvail);
-                                professionalUserMgr.sortAvailabilities();
 
                                 // notification
                                 NotificationManager nm = NotificationManager.create(NotificationManager.APPOINTMENT_CANCELLING);
                                 nm.professionalId(professionalUserMgr.id());
                                 clientMgr.notification(nm.notification());
+                                clientMgr.sortAvailabilities();
                                 repo.updateUser(clientMgr.user());
+                                professionalUserMgr.sortAvailabilities();
                                 repo.updateUser(professionalUserMgr.user());
                                 return 0;
                             }
@@ -239,11 +241,13 @@ public class AvailabilityManager extends Manager {
                                     clientAvailabilities.remove(clientAvailability);
                                     restoredClientMgr.sortAvailabilities();
                                     // atualizar cliente
+                                    restoredClientMgr.sortAvailabilities();
                                     repository.updateUser(restoredClientMgr.user());
                                     userAvailability.setAppointment(null);
                                     // remover appointment do profissional
                                     userAvailability.setState(Availability.AVAILABLE);
                                     // mudar estado da disponibilidade para disponivel
+                                    userMgr.sortAvailabilities();
                                     repository.updateUser(userMgr.user());
                                     // atualizar profissional
                                     return true;
@@ -269,6 +273,7 @@ public class AvailabilityManager extends Manager {
                                     // mudar estado da disponibilidade para disponivel
                                     profAvailability.setState(Availability.AVAILABLE);
                                     // atualizar profissional
+                                    restoredProfMgr.sortAvailabilities();
                                     repository.updateUser(restoredProfMgr.user());
                                 }
                             }
@@ -276,6 +281,7 @@ public class AvailabilityManager extends Manager {
                         // remover disponibilidade do cliente
                         userAvailabilities.remove(userAvailability);
                         // atualizar cliente
+                        userMgr.sortAvailabilities();
                         repository.updateUser(userMgr.user());
                         return true;
                     }

@@ -235,6 +235,7 @@ public class MainController {
         }
         int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
         ServSimplesApplication.logi(TAG, "validation code: " + String.valueOf(tokenValidationCode));
+        restUserMgr.sortAvailabilities();
         return mAuthManager.handleTokenValidation(restUserMgr::user, tokenValidationCode);
     }
 
@@ -270,6 +271,7 @@ public class MainController {
             restUserMgr.password(tranUserMgr.password());
             restUserMgr.type(tranUserMgr.type());
             restUserMgr.name(tranUserMgr.name());
+            restUserMgr.sortAvailabilities();
             mRepository.updateUser(restUserMgr.user());
             tranUserMgr.token(mAuthManager.createTokenForUser(tranUserMgr.user()));
             return tranUserMgr.user();
@@ -313,6 +315,7 @@ public class MainController {
         int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
         return mAuthManager.handleTokenValidation(() -> {
             restUserMgr.service(tranUserMgr.service());
+            restUserMgr.sortAvailabilities();
             mRepository.updateUser(restUserMgr.user());
             return tranUserMgr.user();
         }, tokenValidationCode);
@@ -343,6 +346,7 @@ public class MainController {
 
         return mAuthManager.handleTokenValidation(() -> {
             restUserMgr.updateService(tranUserMgr.service());
+            restUserMgr.sortAvailabilities();
             mRepository.updateUser(restUserMgr.user());
             return tranUserMgr.user();
         }, tokenValidationCode);
@@ -373,6 +377,7 @@ public class MainController {
 
         return mAuthManager.handleTokenValidation(() -> {
             restUserMgr.removeService(tranUserMgr.service());
+            restUserMgr.sortAvailabilities();
             mRepository.updateUser(restUserMgr.user());
             return tranUserMgr.user();
         }, tokenValidationCode);
@@ -406,11 +411,29 @@ public class MainController {
                 () -> {
                     User userByService = mRepository.getUserByService(tranUserMgr.service());
                     User responseUser = new User();
+                    responseUser.setId(userByService.getId());
                     responseUser.setBio(userByService.getBio());
                     responseUser.setName(userByService.getName());
+                    responseUser.setCpf(userByService.getCpf());
                     return responseUser;
                 },
                 mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString()));
+    }
+
+    @PostMapping("api/get/availability/by/professional")
+    public ResponseEntity<String> getAvailabilityForProfessional(@RequestBody AppointmentWrapper appointmentWrapper) {
+        UserManager transUserMgr = UserManager.create(appointmentWrapper.getClient());
+        UserManager rstProfessionalMgr = UserManager.create(mRepository.getUserByCPF(appointmentWrapper.getProfessional().getCpf()));
+        ServSimplesApplication.logi(TAG, "[getAvailabilityForProfessional] user info:" + getUserInfoString(transUserMgr.user()));
+
+        UserManager restoredUserMgr = UserManager.create(mRepository.getUserByCPF(transUserMgr.cpf()));
+        if (restoredUserMgr.isNull() || rstProfessionalMgr.isNull()) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
+                    getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
+        }
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restoredUserMgr.user(), transUserMgr.tokenString());
+        rstProfessionalMgr.sortAvailabilities();
+        return mAuthManager.handleTokenValidation(rstProfessionalMgr::availabilities, tokenValidationCode);
     }
 
     private List<String> getMockCategories() {

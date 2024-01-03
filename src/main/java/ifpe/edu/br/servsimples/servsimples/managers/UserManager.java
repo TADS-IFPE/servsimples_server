@@ -5,6 +5,7 @@
  */
 package ifpe.edu.br.servsimples.servsimples.managers;
 
+import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
 import ifpe.edu.br.servsimples.servsimples.autentication.Token;
 import ifpe.edu.br.servsimples.servsimples.model.*;
 import jakarta.annotation.Nullable;
@@ -32,6 +33,7 @@ public class UserManager extends Manager {
     public static final int LOGIN_INFO_LENGTH_ERROR = 12;
     public static final int USER_INFO_DUPLICATED = 13;
     public static final int DUPLICATED_INFO = 14;
+    private static final String TAG = UserManager.class.getSimpleName();
 
     private final User user;
 
@@ -220,7 +222,19 @@ public class UserManager extends Manager {
     }
 
     public void sortAvailabilities() {
+        String s = "";
+        for (int i = 0; i < user.getAgenda().getAvailabilities().size(); i++) {
+            s += i + ": start time:[" + user.getAgenda().getAvailabilities().get(i).getStartTime() +"] ";
+        }
+        ServSimplesApplication.logi(TAG, "sortAvailabilities before: " + s);
+
         user.getAgenda().getAvailabilities().sort(Comparator.comparingLong(Availability::getStartTime));
+
+        s = "";
+        for (int i = 0; i < user.getAgenda().getAvailabilities().size(); i++) {
+            s += i + ": start time:[" + user.getAgenda().getAvailabilities().get(i).getStartTime() +"] ";
+        }
+        ServSimplesApplication.logi(TAG, "sortAvailabilities after: " + s);
     }
 
     public List<Appointment> appointments() {
