@@ -231,7 +231,7 @@ public class UserManager extends Manager {
     }
 
     public void sortNotification() {
-        user.getNotifications().sort(Comparator.comparingLong(Notification::getTimestamp));
+        user.getNotifications().sort(Comparator.comparingLong(Notification::getTimestamp).reversed());
     }
 
     public List<Appointment> appointments() {
