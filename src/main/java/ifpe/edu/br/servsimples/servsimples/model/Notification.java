@@ -21,4 +21,9 @@ public class Notification {
     private long timestamp;
     private long clientId;
     private long professionalId;
+    private boolean isNew;
+
+    public void isNew(boolean b) {
+        this.isNew = b;
+    }
 }

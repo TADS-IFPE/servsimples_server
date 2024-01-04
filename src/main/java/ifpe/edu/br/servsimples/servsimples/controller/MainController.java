@@ -12,10 +12,7 @@ import ifpe.edu.br.servsimples.servsimples.managers.AuthManager;
 import ifpe.edu.br.servsimples.servsimples.managers.AvailabilityManager;
 import ifpe.edu.br.servsimples.servsimples.managers.ServiceManager;
 import ifpe.edu.br.servsimples.servsimples.managers.UserManager;
-import ifpe.edu.br.servsimples.servsimples.model.Appointment;
-import ifpe.edu.br.servsimples.servsimples.model.Availability;
-import ifpe.edu.br.servsimples.servsimples.model.Service;
-import ifpe.edu.br.servsimples.servsimples.model.User;
+import ifpe.edu.br.servsimples.servsimples.model.*;
 import ifpe.edu.br.servsimples.servsimples.repo.Repository;
 import ifpe.edu.br.servsimples.servsimples.repo.ServiceRepo;
 import ifpe.edu.br.servsimples.servsimples.repo.UserRepo;
@@ -115,6 +112,30 @@ public class MainController {
                 mRepository.updateUser(restUserMgr.user());
             }
             return availabilityValidationCode;
+        }, tokenValidationCode);
+    }
+    @PostMapping("api/register/user/notification/viewed")
+    public ResponseEntity<String> setNotificationAsRead(@RequestBody User user) {
+        ServSimplesApplication.logi(TAG, "setNotificationAsRead: " + getUserInfoString(user));
+        UserManager tranUserMgr = UserManager.create(user);
+        UserManager restUserMgr = UserManager.create(mRepository.getUserByCPF(tranUserMgr.cpf()));
+        if (restUserMgr.isNull()) {
+            return getResponseEntityFrom(InterfacesWrapper.ServSimplesHTTPConstants.USER_NOT_EXISTS,
+                    getErrorMessageByCode(UserManager.USER_NOT_EXISTS));
+        }
+        int tokenValidationCode = mAuthManager.getTokenValidationCode(restUserMgr.user(), tranUserMgr.tokenString());
+        return mAuthManager.handleTokenValidation(() -> {
+            List<Notification> notifications = restUserMgr.notifications();
+            if (tranUserMgr.notification() == null) return false;
+            for (Notification n : notifications) {
+                if (n.getTimestamp() == tranUserMgr.notification().getTimestamp()) {
+                    n.isNew(false);
+                    restUserMgr.sortNotification();
+                    mRepository.updateUser(restUserMgr.user());
+                    return true;
+                }
+            }
+            return false;
         }, tokenValidationCode);
     }
 

@@ -5,12 +5,10 @@
  */
 package ifpe.edu.br.servsimples.servsimples.managers;
 
-import ifpe.edu.br.servsimples.servsimples.ServSimplesApplication;
 import ifpe.edu.br.servsimples.servsimples.autentication.Token;
 import ifpe.edu.br.servsimples.servsimples.model.*;
 import jakarta.annotation.Nullable;
 
-import javax.swing.*;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -221,27 +219,26 @@ public class UserManager extends Manager {
         this.user.getNotifications().add(notification);
     }
 
+    public Notification notification(){
+        if (isNull()) return null;
+        if (user.getNotifications().isEmpty()) return null;
+        return user.getNotifications().get(0);
+    }
+
     public void sortAvailabilities() {
-        String s = "";
-        for (int i = 0; i < user.getAgenda().getAvailabilities().size(); i++) {
-            s += i + ": start time:[" + user.getAgenda().getAvailabilities().get(i).getStartTime() +"] ";
-        }
-        ServSimplesApplication.logi(TAG, "sortAvailabilities before: " + s);
-
         user.getAgenda().getAvailabilities().sort(Comparator.comparingLong(Availability::getStartTime));
+        sortNotification(); // TODO FIX ME for the love of god
+    }
 
-        s = "";
-        for (int i = 0; i < user.getAgenda().getAvailabilities().size(); i++) {
-            s += i + ": start time:[" + user.getAgenda().getAvailabilities().get(i).getStartTime() +"] ";
-        }
-        ServSimplesApplication.logi(TAG, "sortAvailabilities after: " + s);
+    public void sortNotification() {
+        user.getNotifications().sort(Comparator.comparingLong(Notification::getTimestamp));
     }
 
     public List<Appointment> appointments() {
         if (isNull()) return null;
         List<Availability> availabilities = user.getAgenda().getAvailabilities();
         List<Appointment> appointments = new ArrayList<>();
-        for (Availability a: availabilities) {
+        for (Availability a : availabilities) {
             if (a.getAppointment() != null) {
                 appointments.add(a.getAppointment());
             }
@@ -252,7 +249,7 @@ public class UserManager extends Manager {
     public boolean removeAppointment(Appointment appointment) {
         if (isNull()) return false;
         List<Availability> availabilities = user.getAgenda().getAvailabilities();
-        for (Availability a: availabilities) {
+        for (Availability a : availabilities) {
             if (a.getState() != Availability.AVAILABLE) {
                 if (a.getAppointment() == null) return false;
                 if (isAppointmentsEqual(a.getAppointment(), appointment)) {
@@ -273,5 +270,10 @@ public class UserManager extends Manager {
     public List<Service> services() {
         if (isNull()) return null;
         return user.getServices();
+    }
+
+    public List<Notification> notifications() {
+        if (isNull()) return null;
+        return user.getNotifications();
     }
 }

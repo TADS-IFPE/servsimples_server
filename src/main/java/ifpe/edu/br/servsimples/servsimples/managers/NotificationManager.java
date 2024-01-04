@@ -25,6 +25,7 @@ public class NotificationManager extends Manager {
         Notification n = new Notification();
         n.setMessage("Um evento foi cancelado");
         n.setTimestamp(new Date().getTime());
+        n.isNew(true);
         this.notification = n;
     }
 
@@ -36,6 +37,7 @@ public class NotificationManager extends Manager {
         Notification n = new Notification();
         n.setMessage("Você recebeu uma solicitação de serviço");
         n.setTimestamp(new Date().getTime());
+        n.isNew(true);
         this.notification = n;
     }
 
